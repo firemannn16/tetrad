@@ -43,9 +43,9 @@
             gap: 10px;
         }
 
-        .mode-label {
-            font-size: 14px;
-            color: #666;
+        .mode-text {
+            font-size: 13px;
+            color: #555;
             font-weight: 500;
         }
 
@@ -116,7 +116,7 @@
 
         .word-cell {
             padding: 12px 15px;
-            font-size: 16px;
+            font-size: 20px;
             vertical-align: middle;
         }
 
@@ -131,7 +131,7 @@
             direction: rtl;
             color: #2c3e50;
             width: 50%;
-            font-size: 17px;
+            font-size: 21px;
         }
 
         .word-cell.hidden {
@@ -145,7 +145,7 @@
             color: #999;
             position: absolute;
             left: 15px;
-            font-size: 16px;
+            font-size: 20px;
         }
 
         .word-cell.arabic.hidden::before {
@@ -179,12 +179,12 @@
             }
 
             .word-cell {
-                font-size: 15px;
+                font-size: 18px;
                 padding: 10px;
             }
 
             .word-cell.arabic {
-                font-size: 16px;
+                font-size: 19px;
             }
         }
     </style>
@@ -195,12 +195,11 @@
         
         <!-- Mode Toggle -->
         <div class="mode-toggle">
-            <span class="mode-label">АРБ → РУС</span>
+            <span class="mode-text" id="mode-text">Формат: АРБ → РУС</span>
             <label class="switch">
                 <input type="checkbox" id="mode-toggle">
                 <span class="slider"></span>
             </label>
-            <span class="mode-label">РУС → АРБ</span>
         </div>
 
         <div id="words-list">
@@ -218,6 +217,7 @@
         let revealedWords = []; // Массив для запоминания раскрытых слов
         const wordsList = document.getElementById('words-list');
         const modeToggle = document.getElementById('mode-toggle');
+        const modeText = document.getElementById('mode-text');
 
         // Функция для загрузки слов
         async function loadWords() {
@@ -286,13 +286,13 @@
                 }
                 
                 if (mode === 'ar-ru') {
-                    // Показываем арабский, скрываем русский
+                    // АРБ → РУС: русский слева, арабский справа
                     row.innerHTML = `
-                        <td class="word-cell arabic">${word.ar}</td>
                         <td class="word-cell russian ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ru}">${revealedWords[index] ? word.ru : ''}</td>
+                        <td class="word-cell arabic">${word.ar}</td>
                     `;
                 } else {
-                    // Показываем русский, скрываем арабский
+                    // РУС → АРБ: русский слева, арабский справа
                     row.innerHTML = `
                         <td class="word-cell russian">${word.ru}</td>
                         <td class="word-cell arabic ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ar}">${revealedWords[index] ? word.ar : ''}</td>
@@ -323,6 +323,14 @@
         // Переключение режима
         modeToggle.addEventListener('change', function() {
             mode = this.checked ? 'ru-ar' : 'ar-ru';
+            
+            // Обновляем текст формата
+            if (mode === 'ar-ru') {
+                modeText.textContent = 'Формат: АРБ → РУС';
+            } else {
+                modeText.textContent = 'Формат: РУС → АРБ';
+            }
+            
             renderWords();
         });
 
