@@ -160,6 +160,15 @@
             text-overflow: ellipsis;
         }
 
+        /* Уменьшенный шрифт для длинных арабских слов */
+        .word-cell.arabic.long-text {
+            font-size: 20px;
+        }
+
+        .word-cell.arabic.very-long-text {
+            font-size: 18px;
+        }
+
         .word-cell.hidden {
             color: transparent;
             user-select: none;
@@ -178,6 +187,14 @@
             left: auto;
             right: 15px;
             font-size: 24px;
+        }
+
+        .word-cell.arabic.long-text.hidden::before {
+            font-size: 20px;
+        }
+
+        .word-cell.arabic.very-long-text.hidden::before {
+            font-size: 18px;
         }
 
         /* Pagination */
@@ -264,9 +281,9 @@
             padding-right: 10px;
         }
 
-        /* Стилизация скроллбара */
+        /* Черный скроллбар */
         .errors-list::-webkit-scrollbar {
-            width: 8px;
+            width: 10px;
         }
 
         .errors-list::-webkit-scrollbar-track {
@@ -275,12 +292,12 @@
         }
 
         .errors-list::-webkit-scrollbar-thumb {
-            background: #ffc107;
+            background: #333;
             border-radius: 10px;
         }
 
         .errors-list::-webkit-scrollbar-thumb:hover {
-            background: #ffb300;
+            background: #000;
         }
 
         .error-item {
@@ -332,6 +349,14 @@
             .word-cell.arabic {
                 font-size: 22px;
                 padding: 10px 12px;
+            }
+
+            .word-cell.arabic.long-text {
+                font-size: 19px;
+            }
+
+            .word-cell.arabic.very-long-text {
+                font-size: 17px;
             }
         }
     </style>
@@ -508,6 +533,20 @@
             return text;
         }
 
+        // Функция для определения класса размера арабского текста
+        function getArabicSizeClass(text) {
+            // Считаем количество дефисов (разделителей между форматами)
+            const separators = (text.match(/ - /g) || []).length;
+            
+            // Если больше 2 форматов (1 дефис = 2 формата)
+            if (separators >= 2) {
+                return 'very-long-text'; // 3+ формата
+            } else if (separators === 1) {
+                return 'long-text'; // 2 формата
+            }
+            return ''; // 1 формат
+        }
+
         // Функция для отрисовки слов
         function renderWords() {
             wordsList.innerHTML = '';
@@ -521,6 +560,8 @@
             const startIndex = currentPage * wordsPerPage;
             const endIndex = Math.min(startIndex + wordsPerPage, words.length);
             const currentWords = words.slice(startIndex, endIndex);
+
+            console.log(`Отображаем слова ${startIndex + 1}-${endIndex} из ${words.length}`);
 
             // Создаем таблицу
             const table = document.createElement('table');
@@ -540,17 +581,20 @@
                 // Форматируем русский текст с переносами строк
                 const formattedRu = formatRussian(word.ru);
                 
+                // Определяем класс размера для арабского текста
+                const arabicSizeClass = getArabicSizeClass(word.ar);
+                
                 if (mode === 'ar-ru') {
                     // АРБ → РУС: русский слева, арабский справа
                     row.innerHTML = `
                         <td class="word-cell russian ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ru}">${revealedWords[index] ? formattedRu : ''}</td>
-                        <td class="word-cell arabic">${word.ar}</td>
+                        <td class="word-cell arabic ${arabicSizeClass} ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ar}">${revealedWords[index] ? word.ar : ''}</td>
                     `;
                 } else {
                     // РУС → АРБ: русский слева, арабский справа
                     row.innerHTML = `
                         <td class="word-cell russian">${formattedRu}</td>
-                        <td class="word-cell arabic ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ar}">${revealedWords[index] ? word.ar : ''}</td>
+                        <td class="word-cell arabic ${arabicSizeClass} ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ar}">${revealedWords[index] ? word.ar : ''}</td>
                     `;
                 }
 
@@ -597,10 +641,11 @@
         // Обновление пагинации
         function updatePagination() {
             const totalPages = Math.ceil(words.length / wordsPerPage);
-            const hasNextPage = currentPage < totalPages - 1;
+            const hasNextPage = (currentPage + 1) < totalPages;
 
             if (hasNextPage) {
                 nextPageBtn.style.display = 'inline-block';
+                nextPageBtn.disabled = false;
             } else {
                 nextPageBtn.style.display = 'none';
             }
