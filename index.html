@@ -94,7 +94,7 @@
             transform: translateX(20px);
         }
 
-        /* Words Table - фиксированные колонки */
+        /* Words Table */
         .words-table {
             width: 100%;
             border-collapse: collapse;
@@ -104,7 +104,9 @@
         .word-row {
             border-bottom: 1px solid #e0e0e0;
             cursor: pointer;
-            transition: background-color 0.2s ease;
+            transition: all 0.3s ease;
+            position: relative;
+            background: white;
         }
 
         .word-row:hover {
@@ -115,35 +117,27 @@
             background-color: #e8f5e9;
         }
 
+        .word-row.swiping {
+            transition: none;
+        }
+
+        .word-row.error-swipe {
+            background-color: #ffcdd2;
+        }
+
         .word-cell {
-            padding: 12px 10px;
-            font-size: 23px;
+            padding: 12px 15px;
             vertical-align: middle;
             word-wrap: break-word;
             overflow-wrap: break-word;
         }
 
-        .word-cell.error-btn {
-            width: 50px;
-            padding: 12px 5px;
-            text-align: center;
-        }
-
-        .error-icon {
-            font-size: 22px;
-            cursor: pointer;
-            transition: transform 0.2s;
-            display: inline-block;
-        }
-
-        .error-icon:hover {
-            transform: scale(1.2);
-        }
-
         .word-cell.russian {
             text-align: left;
             color: #2c3e50;
-            width: 45%;
+            width: 50%;
+            font-size: 18px;
+            line-height: 1.4;
         }
 
         .word-cell.arabic {
@@ -151,7 +145,10 @@
             direction: rtl;
             color: #2c3e50;
             font-size: 24px;
-            width: 45%;
+            width: 50%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .word-cell.hidden {
@@ -164,13 +161,14 @@
             content: '**********';
             color: #999;
             position: absolute;
-            left: 10px;
-            font-size: 23px;
+            left: 15px;
+            font-size: 18px;
         }
 
         .word-cell.arabic.hidden::before {
             left: auto;
-            right: 10px;
+            right: 15px;
+            font-size: 24px;
         }
 
         /* Errors Section */
@@ -262,17 +260,14 @@
                 font-size: 20px;
             }
 
-            .word-cell {
-                font-size: 20px;
-                padding: 10px 8px;
+            .word-cell.russian {
+                font-size: 17px;
+                padding: 10px 12px;
             }
 
             .word-cell.arabic {
-                font-size: 21px;
-            }
-
-            .word-cell.error-btn {
-                width: 45px;
+                font-size: 22px;
+                padding: 10px 12px;
             }
         }
     </style>
@@ -295,7 +290,8 @@
         </div>
 
         <div class="hint">
-            💡 Нажмите на строку, чтобы показать перевод
+            💡 Нажмите на строку, чтобы показать перевод<br>
+            👉 Свайп вправо, чтобы отметить как ошибку
         </div>
 
         <!-- Errors Section -->
@@ -320,6 +316,11 @@
         const modeText = document.getElementById('mode-text');
         const errorsList = document.getElementById('errors-list');
         const copyErrorsBtn = document.getElementById('copy-errors-btn');
+
+        // Свайп переменные
+        let touchStartX = 0;
+        let touchCurrentX = 0;
+        let isSwiping = false;
 
         // Функция для загрузки слов
         async function loadWords() {
@@ -407,6 +408,16 @@
             });
         });
 
+        // Функция для форматирования русского текста (каждый вариант с новой строки)
+        function formatRussian(text) {
+            // Разделяем по дефису с пробелами
+            const parts = text.split(' - ');
+            if (parts.length > 1) {
+                return parts.join('<br>');
+            }
+            return text;
+        }
+
         // Функция для отрисовки слов
         function renderWords() {
             wordsList.innerHTML = '';
@@ -430,28 +441,31 @@
                     row.classList.add('revealed');
                 }
                 
-                // Кнопка ошибки
-                const errorBtn = `<td class="word-cell error-btn" onclick="event.stopPropagation(); addError(${index});"><span class="error-icon">❌</span></td>`;
+                // Форматируем русский текст с переносами строк
+                const formattedRu = formatRussian(word.ru);
                 
                 if (mode === 'ar-ru') {
                     // АРБ → РУС: русский слева, арабский справа
                     row.innerHTML = `
-                        ${errorBtn}
-                        <td class="word-cell russian ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ru}">${revealedWords[index] ? word.ru : ''}</td>
+                        <td class="word-cell russian ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ru}">${revealedWords[index] ? formattedRu : ''}</td>
                         <td class="word-cell arabic">${word.ar}</td>
                     `;
                 } else {
                     // РУС → АРБ: русский слева, арабский справа
                     row.innerHTML = `
-                        ${errorBtn}
-                        <td class="word-cell russian">${word.ru}</td>
+                        <td class="word-cell russian">${formattedRu}</td>
                         <td class="word-cell arabic ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ar}">${revealedWords[index] ? word.ar : ''}</td>
                     `;
                 }
 
+                // Touch события для свайпа
+                row.addEventListener('touchstart', handleTouchStart, false);
+                row.addEventListener('touchmove', handleTouchMove, false);
+                row.addEventListener('touchend', handleTouchEnd, false);
+
+                // Клик для раскрытия
                 row.addEventListener('click', function(e) {
-                    // Игнорируем клик, если это была кнопка ошибки
-                    if (e.target.classList.contains('error-icon')) return;
+                    if (isSwiping) return; // Не раскрываем если был свайп
                     
                     const index = parseInt(this.dataset.index);
                     const hiddenCell = this.querySelector('.hidden');
@@ -459,7 +473,14 @@
                     if (hiddenCell) {
                         const text = hiddenCell.dataset.text;
                         hiddenCell.classList.remove('hidden');
-                        hiddenCell.textContent = text;
+                        
+                        // Форматируем текст
+                        if (hiddenCell.classList.contains('russian')) {
+                            hiddenCell.innerHTML = formatRussian(text);
+                        } else {
+                            hiddenCell.textContent = text;
+                        }
+                        
                         this.classList.add('revealed');
                         
                         // Запоминаем, что слово раскрыто
@@ -471,6 +492,68 @@
             });
 
             wordsList.appendChild(table);
+        }
+
+        function handleTouchStart(e) {
+            touchStartX = e.touches[0].clientX;
+            isSwiping = false;
+        }
+
+        function handleTouchMove(e) {
+            if (!touchStartX) return;
+            
+            touchCurrentX = e.touches[0].clientX;
+            const diff = touchCurrentX - touchStartX;
+            
+            if (Math.abs(diff) > 10) {
+                isSwiping = true;
+                this.classList.add('swiping');
+                
+                if (diff > 0) {
+                    this.style.transform = `translateX(${diff}px)`;
+                    this.style.opacity = 1 - (diff / 200);
+                    
+                    if (diff > 50) {
+                        this.classList.add('error-swipe');
+                    }
+                }
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (!isSwiping) {
+                return;
+            }
+            
+            const diff = touchCurrentX - touchStartX;
+            
+            if (diff > 100) {
+                // Свайп достаточно длинный - добавляем в ошибки
+                const index = parseInt(this.dataset.index);
+                addError(index);
+                
+                // Анимация удаления
+                this.style.transform = 'translateX(100%)';
+                this.style.opacity = '0';
+                
+                setTimeout(() => {
+                    this.style.transform = '';
+                    this.style.opacity = '';
+                    this.classList.remove('swiping', 'error-swipe');
+                }, 300);
+            } else {
+                // Возвращаем на место
+                this.style.transform = '';
+                this.style.opacity = '';
+                this.classList.remove('swiping', 'error-swipe');
+            }
+            
+            touchStartX = 0;
+            touchCurrentX = 0;
+            
+            setTimeout(() => {
+                isSwiping = false;
+            }, 100);
         }
 
         // Переключение режима
