@@ -39,7 +39,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-bottom: 25px;
+            margin-bottom: 15px;
             gap: 10px;
         }
 
@@ -92,6 +92,15 @@
 
         input:checked + .slider:before {
             transform: translateX(20px);
+        }
+
+        /* Stats */
+        .stats {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
         }
 
         /* Words Table */
@@ -171,6 +180,39 @@
             font-size: 24px;
         }
 
+        /* Pagination */
+        .pagination {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .page-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .page-btn:hover {
+            background: #1976D2;
+        }
+
+        .page-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .page-info {
+            margin-top: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+
         /* Errors Section */
         .errors-section {
             margin-top: 40px;
@@ -214,9 +256,31 @@
         }
 
         .errors-list {
-            font-size: 18px;
+            font-size: 16px;
             color: #333;
-            line-height: 1.8;
+            line-height: 1.6;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        /* Стилизация скроллбара */
+        .errors-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .errors-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .errors-list::-webkit-scrollbar-thumb {
+            background: #ffc107;
+            border-radius: 10px;
+        }
+
+        .errors-list::-webkit-scrollbar-thumb:hover {
+            background: #ffb300;
         }
 
         .error-item {
@@ -285,8 +349,19 @@
             </label>
         </div>
 
+        <!-- Stats -->
+        <div class="stats" id="stats">
+            ВСЕГО: 0, ОСТАЛОСЬ ПРОЙТИ: 0
+        </div>
+
         <div id="words-list">
             <div class="loading">Загрузка слов...</div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination">
+            <button class="page-btn" id="next-page-btn" style="display: none;">Перейти к следующим словам</button>
+            <div class="page-info" id="page-info"></div>
         </div>
 
         <div class="hint">
@@ -311,11 +386,17 @@
         let mode = 'ar-ru'; // Изначально АРБ → РУС
         let revealedWords = []; // Массив для запоминания раскрытых слов
         let errorWords = []; // Массив для хранения ошибок
+        let currentPage = 0;
+        const wordsPerPage = 100;
+        
         const wordsList = document.getElementById('words-list');
         const modeToggle = document.getElementById('mode-toggle');
         const modeText = document.getElementById('mode-text');
         const errorsList = document.getElementById('errors-list');
         const copyErrorsBtn = document.getElementById('copy-errors-btn');
+        const nextPageBtn = document.getElementById('next-page-btn');
+        const pageInfo = document.getElementById('page-info');
+        const statsEl = document.getElementById('stats');
 
         // Свайп переменные
         let touchStartX = 0;
@@ -357,12 +438,21 @@
                 revealedWords = new Array(words.length).fill(false);
                 
                 console.log('Загружено слов:', words.length);
+                updateStats();
                 renderWords();
                 
             } catch (error) {
                 console.error('Ошибка загрузки слов:', error);
                 wordsList.innerHTML = '<div class="loading">❌ Ошибка загрузки слов</div>';
             }
+        }
+
+        // Обновление статистики
+        function updateStats() {
+            const total = words.length;
+            const completed = revealedWords.filter(r => r).length;
+            const remaining = total - completed;
+            statsEl.textContent = `ВСЕГО: ${total}, ОСТАЛОСЬ ПРОЙТИ: ${remaining}`;
         }
 
         // Функция для добавления ошибки
@@ -427,11 +517,17 @@
                 return;
             }
 
+            // Вычисляем диапазон слов для текущей страницы
+            const startIndex = currentPage * wordsPerPage;
+            const endIndex = Math.min(startIndex + wordsPerPage, words.length);
+            const currentWords = words.slice(startIndex, endIndex);
+
             // Создаем таблицу
             const table = document.createElement('table');
             table.className = 'words-table';
             
-            words.forEach((word, index) => {
+            currentWords.forEach((word, idx) => {
+                const index = startIndex + idx; // Реальный индекс в массиве words
                 const row = document.createElement('tr');
                 row.className = 'word-row';
                 row.dataset.index = index;
@@ -485,6 +581,7 @@
                         
                         // Запоминаем, что слово раскрыто
                         revealedWords[index] = true;
+                        updateStats();
                     }
                 });
 
@@ -492,7 +589,33 @@
             });
 
             wordsList.appendChild(table);
+
+            // Обновляем пагинацию
+            updatePagination();
         }
+
+        // Обновление пагинации
+        function updatePagination() {
+            const totalPages = Math.ceil(words.length / wordsPerPage);
+            const hasNextPage = currentPage < totalPages - 1;
+
+            if (hasNextPage) {
+                nextPageBtn.style.display = 'inline-block';
+            } else {
+                nextPageBtn.style.display = 'none';
+            }
+
+            const startIndex = currentPage * wordsPerPage + 1;
+            const endIndex = Math.min((currentPage + 1) * wordsPerPage, words.length);
+            pageInfo.textContent = `Страница ${currentPage + 1} из ${totalPages} (слова ${startIndex}-${endIndex})`;
+        }
+
+        // Переход на следующую страницу
+        nextPageBtn.addEventListener('click', function() {
+            currentPage++;
+            renderWords();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
 
         function handleTouchStart(e) {
             touchStartX = e.touches[0].clientX;
@@ -515,6 +638,8 @@
                     
                     if (diff > 50) {
                         this.classList.add('error-swipe');
+                    } else {
+                        this.classList.remove('error-swipe');
                     }
                 }
             }
@@ -522,6 +647,7 @@
 
         function handleTouchEnd(e) {
             if (!isSwiping) {
+                touchStartX = 0;
                 return;
             }
             
@@ -532,11 +658,12 @@
                 const index = parseInt(this.dataset.index);
                 addError(index);
                 
-                // Анимация удаления
-                this.style.transform = 'translateX(100%)';
+                // Визуальная обратная связь
+                this.style.transform = 'translateX(150px)';
                 this.style.opacity = '0';
                 
                 setTimeout(() => {
+                    // Возвращаем строку на место без удаления
                     this.style.transform = '';
                     this.style.opacity = '';
                     this.classList.remove('swiping', 'error-swipe');
