@@ -94,10 +94,11 @@
             transform: translateX(20px);
         }
 
-        /* Words Table */
+        /* Words Table - фиксированные колонки */
         .words-table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
         }
 
         .word-row {
@@ -118,13 +119,12 @@
             padding: 12px 10px;
             font-size: 23px;
             vertical-align: middle;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .word-cell.error-btn {
-            width: 40px;
+            width: 50px;
             padding: 12px 5px;
             text-align: center;
         }
@@ -143,6 +143,7 @@
         .word-cell.russian {
             text-align: left;
             color: #2c3e50;
+            width: 45%;
         }
 
         .word-cell.arabic {
@@ -150,6 +151,7 @@
             direction: rtl;
             color: #2c3e50;
             font-size: 24px;
+            width: 45%;
         }
 
         .word-cell.hidden {
@@ -267,6 +269,10 @@
 
             .word-cell.arabic {
                 font-size: 21px;
+            }
+
+            .word-cell.error-btn {
+                width: 45px;
             }
         }
     </style>
