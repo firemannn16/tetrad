@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тренажер арабских слов</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            direction: ltr;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .word-item {
+            background: #fff;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .word-item:hover {
+            border-color: #4CAF50;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .word-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 20px;
+        }
+
+        .translation {
+            font-weight: bold;
+            color: #333;
+            min-width: 200px;
+        }
+
+        .translation.hidden {
+            color: transparent;
+            user-select: none;
+        }
+
+        .translation.hidden::before {
+            content: '**********';
+            color: #999;
+        }
+
+        .arabic {
+            font-size: 24px;
+            direction: rtl;
+            color: #2c3e50;
+        }
+
+        .revealed {
+            background: #e8f5e9;
+            border-color: #4CAF50;
+        }
+
+        .hint {
+            text-align: center;
+            color: #666;
+            margin-top: 20px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Тренажер арабских слов</h1>
+        
+        <div id="words-list"></div>
+
+        <div class="hint">
+            💡 Нажмите на строку, чтобы показать/скрыть перевод
+        </div>
+    </div>
+
+    <script>
+        const words = [
+            { ru: 'свет', ar: 'ضَوْءٌ - أَضْوَاءٌ' },
+            { ru: 'скрываться', ar: 'اِحْتَجَبَ - يَحْتَجِبُ' },
+            { ru: 'звезда', ar: 'نَجْمٌ - نُجُومٌ' }
+        ];
+
+        const wordsList = document.getElementById('words-list');
+
+        words.forEach((word, index) => {
+            const wordItem = document.createElement('div');
+            wordItem.className = 'word-item';
+            wordItem.innerHTML = `
+                <div class="word-content">
+                    <span class="translation hidden" data-text="${word.ru}"></span>
+                    <span class="arabic">${word.ar}</span>
+                </div>
+            `;
+
+            wordItem.addEventListener('click', function() {
+                const translation = this.querySelector('.translation');
+                const isHidden = translation.classList.contains('hidden');
+                
+                if (isHidden) {
+                    translation.classList.remove('hidden');
+                    translation.textContent = word.ru;
+                    this.classList.add('revealed');
+                } else {
+                    translation.classList.add('hidden');
+                    translation.textContent = '';
+                    this.classList.remove('revealed');
+                }
+            });
+
+            wordsList.appendChild(wordItem);
+        });
+    </script>
+</body>
+</html>
