@@ -244,6 +244,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .errors-title {
@@ -252,8 +254,12 @@
             color: #333;
         }
 
-        .copy-btn {
-            background: #4CAF50;
+        .errors-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .copy-btn, .restore-btn {
             color: white;
             border: none;
             padding: 10px 20px;
@@ -264,12 +270,28 @@
             transition: background 0.3s;
         }
 
+        .copy-btn {
+            background: #4CAF50;
+        }
+
         .copy-btn:hover {
             background: #45a049;
         }
 
         .copy-btn:active {
             background: #3d8b40;
+        }
+
+        .restore-btn {
+            background: #FF9800;
+        }
+
+        .restore-btn:hover {
+            background: #F57C00;
+        }
+
+        .restore-btn:active {
+            background: #E65100;
         }
 
         .errors-list {
@@ -281,23 +303,24 @@
             padding-right: 10px;
         }
 
-        /* Черный скроллбар */
+        /* Более заметный черный скроллбар */
         .errors-list::-webkit-scrollbar {
-            width: 10px;
+            width: 12px;
         }
 
         .errors-list::-webkit-scrollbar-track {
-            background: #f1f1f1;
+            background: #e0e0e0;
             border-radius: 10px;
         }
 
         .errors-list::-webkit-scrollbar-thumb {
-            background: #333;
+            background: #000;
             border-radius: 10px;
+            border: 2px solid #e0e0e0;
         }
 
         .errors-list::-webkit-scrollbar-thumb:hover {
-            background: #000;
+            background: #222;
         }
 
         .error-item {
@@ -358,6 +381,20 @@
             .word-cell.arabic.very-long-text {
                 font-size: 17px;
             }
+
+            .errors-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .errors-buttons {
+                width: 100%;
+                flex-direction: column;
+            }
+
+            .copy-btn, .restore-btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -398,7 +435,10 @@
         <div class="errors-section">
             <div class="errors-header">
                 <span class="errors-title">Ошибки:</span>
-                <button class="copy-btn" id="copy-errors-btn">Копировать ошибки</button>
+                <div class="errors-buttons">
+                    <button class="restore-btn" id="restore-words-btn">Вернуть слова</button>
+                    <button class="copy-btn" id="copy-errors-btn">Копировать ошибки</button>
+                </div>
             </div>
             <div class="errors-list" id="errors-list">
                 <div class="no-errors">Ошибок пока нет</div>
@@ -408,9 +448,10 @@
 
     <script>
         let words = [];
+        let originalWords = []; // Оригинальный массив без перемешивания
         let mode = 'ar-ru'; // Изначально АРБ → РУС
         let revealedWords = []; // Массив для запоминания раскрытых слов
-        let errorWords = []; // Массив для хранения ошибок
+        let errorWords = []; // Массив для хранения ошибок (с индексами)
         let currentPage = 0;
         const wordsPerPage = 100;
         
@@ -419,6 +460,7 @@
         const modeText = document.getElementById('mode-text');
         const errorsList = document.getElementById('errors-list');
         const copyErrorsBtn = document.getElementById('copy-errors-btn');
+        const restoreWordsBtn = document.getElementById('restore-words-btn');
         const nextPageBtn = document.getElementById('next-page-btn');
         const pageInfo = document.getElementById('page-info');
         const statsEl = document.getElementById('stats');
@@ -428,9 +470,18 @@
         let touchCurrentX = 0;
         let isSwiping = false;
 
+        // Функция для перемешивания массива (алгоритм Фишера-Йетса)
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
         // Функция для поиска разделителя в строке
         function findSeparator(line) {
-            // Проверяем разные варианты тире в порядке приоритета
             if (line.includes(' — ')) return ' — ';
             if (line.includes('—')) return '—';
             if (line.includes(' – ')) return ' – ';
@@ -452,66 +503,58 @@
                 const text = await response.text();
                 console.log('Файл загружен, длина:', text.length, 'символов');
                 
-                // Парсим файл
                 const lines = text.split('\n');
                 console.log('Всего строк в файле:', lines.length);
                 
-                words = [];
+                originalWords = [];
                 let skippedLines = 0;
                 
                 lines.forEach((line, lineNum) => {
-                    // Убираем пробелы и невидимые символы
                     line = line.trim().replace(/\r/g, '');
                     
-                    // Пропускаем пустые строки
                     if (!line || line.length < 3) {
                         return;
                     }
                     
-                    // Ищем разделитель
                     const separator = findSeparator(line);
                     
                     if (!separator) {
-                        console.warn(`Строка ${lineNum + 1}: нет разделителя - "${line.substring(0, 50)}"`);
+                        console.warn(`Строка ${lineNum + 1}: нет разделителя`);
                         skippedLines++;
                         return;
                     }
                     
-                    // Разделяем по найденному разделителю
                     const parts = line.split(separator);
                     
                     if (parts.length < 2) {
-                        console.warn(`Строка ${lineNum + 1}: не удалось разделить - "${line.substring(0, 50)}"`);
                         skippedLines++;
                         return;
                     }
                     
                     const ru = parts[0].trim();
-                    // Все остальное после первого разделителя - это арабский (может содержать свои разделители)
                     const ar = parts.slice(1).join(separator).trim();
                     
                     if (ru && ar) {
-                        words.push({ ru, ar });
+                        originalWords.push({ ru, ar });
                     } else {
-                        console.warn(`Строка ${lineNum + 1}: пустые данные - ru: "${ru}", ar: "${ar}"`);
                         skippedLines++;
                     }
                 });
                 
-                console.log('✓ Успешно загружено слов:', words.length);
+                console.log('✓ Успешно загружено слов:', originalWords.length);
                 console.log('✗ Пропущено строк:', skippedLines);
                 
-                if (words.length > 0) {
-                    console.log('Первое слово:', words[0]);
-                    console.log('Последнее слово:', words[words.length - 1]);
+                if (originalWords.length === 0) {
+                    throw new Error('Не удалось загрузить ни одного слова');
                 }
                 
-                if (words.length === 0) {
-                    throw new Error('Не удалось загрузить ни одного слова. Проверьте формат файла.');
-                }
+                // Перемешиваем слова
+                words = shuffleArray(originalWords);
                 
                 // Инициализируем массив раскрытых слов
                 revealedWords = new Array(words.length).fill(false);
+                
+                console.log('Слова перемешаны!');
                 
                 updateStats();
                 renderWords();
@@ -533,11 +576,14 @@
         // Функция для добавления ошибки
         function addError(index) {
             const word = words[index];
-            const errorText = `${word.ru} — ${word.ar}`;
+            const errorEntry = {
+                index: index,
+                text: `${word.ru} — ${word.ar}`
+            };
             
-            // Проверяем, нет ли уже такой ошибки
-            if (!errorWords.includes(errorText)) {
-                errorWords.push(errorText);
+            // Проверяем, нет ли уже такой ошибки по индексу
+            if (!errorWords.find(e => e.index === index)) {
+                errorWords.push(errorEntry);
                 renderErrors();
             }
         }
@@ -548,7 +594,7 @@
                 errorsList.innerHTML = '<div class="no-errors">Ошибок пока нет</div>';
             } else {
                 errorsList.innerHTML = errorWords.map(error => 
-                    `<div class="error-item">${error}</div>`
+                    `<div class="error-item">${error.text}</div>`
                 ).join('');
             }
         }
@@ -560,7 +606,7 @@
                 return;
             }
             
-            const text = errorWords.join('\n');
+            const text = errorWords.map(e => e.text).join('\n');
             navigator.clipboard.writeText(text).then(() => {
                 const originalText = this.textContent;
                 this.textContent = '✓ Скопировано!';
@@ -573,9 +619,54 @@
             });
         });
 
-        // Функция для форматирования русского текста (каждый вариант с новой строки)
+        // Вернуть слова из ошибок
+        restoreWordsBtn.addEventListener('click', function() {
+            if (errorWords.length === 0) {
+                alert('Нет ошибок для возврата');
+                return;
+            }
+            
+            // Сбрасываем revealed статус для всех ошибочных слов
+            errorWords.forEach(error => {
+                revealedWords[error.index] = false;
+            });
+            
+            // Определяем на какую страницу добавлять
+            const startIndex = currentPage * wordsPerPage;
+            const endIndex = Math.min(startIndex + wordsPerPage, words.length);
+            const wordsOnCurrentPage = endIndex - startIndex;
+            const remainingSlots = wordsPerPage - wordsOnCurrentPage;
+            
+            console.log(`На текущей странице ${wordsOnCurrentPage} слов, свободно ${remainingSlots} мест`);
+            
+            if (errorWords.length <= remainingSlots) {
+                // Все ошибки помещаются на текущую страницу - просто перерисовываем
+                console.log('Все ошибки добавлены на текущую страницу');
+            } else {
+                // Часть на текущую, часть на следующую - переходим на следующую
+                if (currentPage < Math.ceil(words.length / wordsPerPage) - 1) {
+                    currentPage++;
+                    console.log('Перешли на следующую страницу');
+                }
+            }
+            
+            // Очищаем список ошибок
+            errorWords = [];
+            renderErrors();
+            
+            // Обновляем статистику и отображение
+            updateStats();
+            renderWords();
+            
+            const originalText = this.textContent;
+            this.textContent = '✓ Возвращено!';
+            setTimeout(() => {
+                this.textContent = originalText;
+            }, 2000);
+        });
+
+        // Функция для форматирования русского текста
         function formatRussian(text) {
-            // Разделяем по дефису с пробелами
             const parts = text.split(' - ');
             if (parts.length > 1) {
                 return parts.join('<br>');
@@ -585,16 +676,14 @@
 
         // Функция для определения класса размера арабского текста
         function getArabicSizeClass(text) {
-            // Считаем количество дефисов (разделителей между форматами)
             const separators = (text.match(/ - /g) || []).length;
             
-            // Если больше 2 форматов (1 дефис = 2 формата)
             if (separators >= 2) {
-                return 'very-long-text'; // 3+ формата
+                return 'very-long-text';
             } else if (separators === 1) {
-                return 'long-text'; // 2 формата
+                return 'long-text';
             }
-            return ''; // 1 формат
+            return '';
         }
 
         // Функция для отрисовки слов
@@ -606,56 +695,46 @@
                 return;
             }
 
-            // Вычисляем диапазон слов для текущей страницы
             const startIndex = currentPage * wordsPerPage;
             const endIndex = Math.min(startIndex + wordsPerPage, words.length);
             const currentWords = words.slice(startIndex, endIndex);
 
             console.log(`Отображаем слова ${startIndex + 1}-${endIndex} из ${words.length}`);
 
-            // Создаем таблицу
             const table = document.createElement('table');
             table.className = 'words-table';
             
             currentWords.forEach((word, idx) => {
-                const index = startIndex + idx; // Реальный индекс в массиве words
+                const index = startIndex + idx;
                 const row = document.createElement('tr');
                 row.className = 'word-row';
                 row.dataset.index = index;
                 
-                // Если слово уже было раскрыто, добавляем класс revealed
                 if (revealedWords[index]) {
                     row.classList.add('revealed');
                 }
                 
-                // Форматируем русский текст с переносами строк
                 const formattedRu = formatRussian(word.ru);
-                
-                // Определяем класс размера для арабского текста
                 const arabicSizeClass = getArabicSizeClass(word.ar);
                 
                 if (mode === 'ar-ru') {
-                    // АРБ → РУС: русский слева (скрыт), арабский справа (виден)
                     row.innerHTML = `
                         <td class="word-cell russian ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ru}">${revealedWords[index] ? formattedRu : ''}</td>
                         <td class="word-cell arabic ${arabicSizeClass}">${word.ar}</td>
                     `;
                 } else {
-                    // РУС → АРБ: русский слева (виден), арабский справа (скрыт)
                     row.innerHTML = `
                         <td class="word-cell russian">${formattedRu}</td>
                         <td class="word-cell arabic ${arabicSizeClass} ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ar}">${revealedWords[index] ? word.ar : ''}</td>
                     `;
                 }
 
-                // Touch события для свайпа
                 row.addEventListener('touchstart', handleTouchStart, false);
                 row.addEventListener('touchmove', handleTouchMove, false);
                 row.addEventListener('touchend', handleTouchEnd, false);
 
-                // Клик для раскрытия
                 row.addEventListener('click', function(e) {
-                    if (isSwiping) return; // Не раскрываем если был свайп
+                    if (isSwiping) return;
                     
                     const index = parseInt(this.dataset.index);
                     const hiddenCell = this.querySelector('.hidden');
@@ -664,7 +743,6 @@
                         const text = hiddenCell.dataset.text;
                         hiddenCell.classList.remove('hidden');
                         
-                        // Форматируем текст
                         if (hiddenCell.classList.contains('russian')) {
                             hiddenCell.innerHTML = formatRussian(text);
                         } else {
@@ -672,8 +750,6 @@
                         }
                         
                         this.classList.add('revealed');
-                        
-                        // Запоминаем, что слово раскрыто
                         revealedWords[index] = true;
                         updateStats();
                     }
@@ -683,8 +759,6 @@
             });
 
             wordsList.appendChild(table);
-
-            // Обновляем пагинацию
             updatePagination();
         }
 
@@ -705,7 +779,6 @@
             pageInfo.textContent = `Страница ${currentPage + 1} из ${totalPages} (слова ${startIndex}-${endIndex})`;
         }
 
-        // Переход на следующую страницу
         nextPageBtn.addEventListener('click', function() {
             currentPage++;
             renderWords();
@@ -749,22 +822,18 @@
             const diff = touchCurrentX - touchStartX;
             
             if (diff > 100) {
-                // Свайп достаточно длинный - добавляем в ошибки
                 const index = parseInt(this.dataset.index);
                 addError(index);
                 
-                // Визуальная обратная связь
                 this.style.transform = 'translateX(150px)';
                 this.style.opacity = '0';
                 
                 setTimeout(() => {
-                    // Возвращаем строку на место без удаления
                     this.style.transform = '';
                     this.style.opacity = '';
                     this.classList.remove('swiping', 'error-swipe');
                 }, 300);
             } else {
-                // Возвращаем на место
                 this.style.transform = '';
                 this.style.opacity = '';
                 this.classList.remove('swiping', 'error-swipe');
@@ -778,11 +847,9 @@
             }, 100);
         }
 
-        // Переключение режима
         modeToggle.addEventListener('change', function() {
             mode = this.checked ? 'ru-ar' : 'ar-ru';
             
-            // Обновляем текст формата
             if (mode === 'ar-ru') {
                 modeText.textContent = 'Формат: АРБ → РУС';
             } else {
@@ -792,7 +859,6 @@
             renderWords();
         });
 
-        // Загружаем слова при открытии страницы
         loadWords();
     </script>
 </body>
