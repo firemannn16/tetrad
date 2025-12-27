@@ -428,6 +428,18 @@
         let touchCurrentX = 0;
         let isSwiping = false;
 
+        // Функция для поиска разделителя в строке
+        function findSeparator(line) {
+            // Проверяем разные варианты тире в порядке приоритета
+            if (line.includes(' — ')) return ' — ';
+            if (line.includes('—')) return '—';
+            if (line.includes(' – ')) return ' – ';
+            if (line.includes('–')) return '–';
+            if (line.includes(' - ')) return ' - ';
+            if (line.includes('-')) return '-';
+            return null;
+        }
+
         // Функция для загрузки слов
         async function loadWords() {
             try {
@@ -438,37 +450,75 @@
                 }
                 
                 const text = await response.text();
+                console.log('Файл загружен, длина:', text.length, 'символов');
                 
                 // Парсим файл
                 const lines = text.split('\n');
-                words = [];
+                console.log('Всего строк в файле:', lines.length);
                 
-                lines.forEach(line => {
-                    line = line.trim();
-                    if (!line) return;
+                words = [];
+                let skippedLines = 0;
+                
+                lines.forEach((line, lineNum) => {
+                    // Убираем пробелы и невидимые символы
+                    line = line.trim().replace(/\r/g, '');
                     
-                    const parts = line.split('—');
+                    // Пропускаем пустые строки
+                    if (!line || line.length < 3) {
+                        return;
+                    }
                     
-                    if (parts.length >= 2) {
-                        const ru = parts[0].trim();
-                        const ar = parts[1].trim();
-                        
-                        if (ru && ar) {
-                            words.push({ ru, ar });
-                        }
+                    // Ищем разделитель
+                    const separator = findSeparator(line);
+                    
+                    if (!separator) {
+                        console.warn(`Строка ${lineNum + 1}: нет разделителя - "${line.substring(0, 50)}"`);
+                        skippedLines++;
+                        return;
+                    }
+                    
+                    // Разделяем по найденному разделителю
+                    const parts = line.split(separator);
+                    
+                    if (parts.length < 2) {
+                        console.warn(`Строка ${lineNum + 1}: не удалось разделить - "${line.substring(0, 50)}"`);
+                        skippedLines++;
+                        return;
+                    }
+                    
+                    const ru = parts[0].trim();
+                    // Все остальное после первого разделителя - это арабский (может содержать свои разделители)
+                    const ar = parts.slice(1).join(separator).trim();
+                    
+                    if (ru && ar) {
+                        words.push({ ru, ar });
+                    } else {
+                        console.warn(`Строка ${lineNum + 1}: пустые данные - ru: "${ru}", ar: "${ar}"`);
+                        skippedLines++;
                     }
                 });
+                
+                console.log('✓ Успешно загружено слов:', words.length);
+                console.log('✗ Пропущено строк:', skippedLines);
+                
+                if (words.length > 0) {
+                    console.log('Первое слово:', words[0]);
+                    console.log('Последнее слово:', words[words.length - 1]);
+                }
+                
+                if (words.length === 0) {
+                    throw new Error('Не удалось загрузить ни одного слова. Проверьте формат файла.');
+                }
                 
                 // Инициализируем массив раскрытых слов
                 revealedWords = new Array(words.length).fill(false);
                 
-                console.log('Загружено слов:', words.length);
                 updateStats();
                 renderWords();
                 
             } catch (error) {
                 console.error('Ошибка загрузки слов:', error);
-                wordsList.innerHTML = '<div class="loading">❌ Ошибка загрузки слов</div>';
+                wordsList.innerHTML = '<div class="loading">❌ Ошибка загрузки слов: ' + error.message + '</div>';
             }
         }
 
@@ -585,13 +635,13 @@
                 const arabicSizeClass = getArabicSizeClass(word.ar);
                 
                 if (mode === 'ar-ru') {
-                    // АРБ → РУС: русский слева, арабский справа
+                    // АРБ → РУС: русский слева (скрыт), арабский справа (виден)
                     row.innerHTML = `
                         <td class="word-cell russian ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ru}">${revealedWords[index] ? formattedRu : ''}</td>
-                        <td class="word-cell arabic ${arabicSizeClass} ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ar}">${revealedWords[index] ? word.ar : ''}</td>
+                        <td class="word-cell arabic ${arabicSizeClass}">${word.ar}</td>
                     `;
                 } else {
-                    // РУС → АРБ: русский слева, арабский справа
+                    // РУС → АРБ: русский слева (виден), арабский справа (скрыт)
                     row.innerHTML = `
                         <td class="word-cell russian">${formattedRu}</td>
                         <td class="word-cell arabic ${arabicSizeClass} ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ar}">${revealedWords[index] ? word.ar : ''}</td>
