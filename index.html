@@ -34,7 +34,7 @@
             font-size: 24px;
         }
 
-        /* Toggle Switch - меньше */
+        /* Toggle Switch */
         .mode-toggle {
             display: flex;
             justify-content: center;
@@ -115,23 +115,41 @@
         }
 
         .word-cell {
-            padding: 12px 15px;
-            font-size: 20px;
+            padding: 12px 10px;
+            font-size: 23px;
             vertical-align: middle;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .word-cell.error-btn {
+            width: 40px;
+            padding: 12px 5px;
+            text-align: center;
+        }
+
+        .error-icon {
+            font-size: 22px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            display: inline-block;
+        }
+
+        .error-icon:hover {
+            transform: scale(1.2);
         }
 
         .word-cell.russian {
             text-align: left;
             color: #2c3e50;
-            width: 50%;
         }
 
         .word-cell.arabic {
             text-align: right;
             direction: rtl;
             color: #2c3e50;
-            width: 50%;
-            font-size: 21px;
+            font-size: 24px;
         }
 
         .word-cell.hidden {
@@ -144,13 +162,77 @@
             content: '**********';
             color: #999;
             position: absolute;
-            left: 15px;
-            font-size: 20px;
+            left: 10px;
+            font-size: 23px;
         }
 
         .word-cell.arabic.hidden::before {
             left: auto;
-            right: 15px;
+            right: 10px;
+        }
+
+        /* Errors Section */
+        .errors-section {
+            margin-top: 40px;
+            padding: 20px;
+            background: #fff3cd;
+            border-radius: 8px;
+            border: 2px solid #ffc107;
+        }
+
+        .errors-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .errors-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .copy-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #45a049;
+        }
+
+        .copy-btn:active {
+            background: #3d8b40;
+        }
+
+        .errors-list {
+            font-size: 18px;
+            color: #333;
+            line-height: 1.8;
+        }
+
+        .error-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #ffe08a;
+        }
+
+        .error-item:last-child {
+            border-bottom: none;
+        }
+
+        .no-errors {
+            color: #666;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
         }
 
         .hint {
@@ -179,12 +261,12 @@
             }
 
             .word-cell {
-                font-size: 18px;
-                padding: 10px;
+                font-size: 20px;
+                padding: 10px 8px;
             }
 
             .word-cell.arabic {
-                font-size: 19px;
+                font-size: 21px;
             }
         }
     </style>
@@ -209,15 +291,29 @@
         <div class="hint">
             💡 Нажмите на строку, чтобы показать перевод
         </div>
+
+        <!-- Errors Section -->
+        <div class="errors-section">
+            <div class="errors-header">
+                <span class="errors-title">Ошибки:</span>
+                <button class="copy-btn" id="copy-errors-btn">Копировать ошибки</button>
+            </div>
+            <div class="errors-list" id="errors-list">
+                <div class="no-errors">Ошибок пока нет</div>
+            </div>
+        </div>
     </div>
 
     <script>
         let words = [];
         let mode = 'ar-ru'; // Изначально АРБ → РУС
         let revealedWords = []; // Массив для запоминания раскрытых слов
+        let errorWords = []; // Массив для хранения ошибок
         const wordsList = document.getElementById('words-list');
         const modeToggle = document.getElementById('mode-toggle');
         const modeText = document.getElementById('mode-text');
+        const errorsList = document.getElementById('errors-list');
+        const copyErrorsBtn = document.getElementById('copy-errors-btn');
 
         // Функция для загрузки слов
         async function loadWords() {
@@ -262,6 +358,49 @@
             }
         }
 
+        // Функция для добавления ошибки
+        function addError(index) {
+            const word = words[index];
+            const errorText = `${word.ru} — ${word.ar}`;
+            
+            // Проверяем, нет ли уже такой ошибки
+            if (!errorWords.includes(errorText)) {
+                errorWords.push(errorText);
+                renderErrors();
+            }
+        }
+
+        // Функция для отрисовки ошибок
+        function renderErrors() {
+            if (errorWords.length === 0) {
+                errorsList.innerHTML = '<div class="no-errors">Ошибок пока нет</div>';
+            } else {
+                errorsList.innerHTML = errorWords.map(error => 
+                    `<div class="error-item">${error}</div>`
+                ).join('');
+            }
+        }
+
+        // Копирование ошибок в буфер обмена
+        copyErrorsBtn.addEventListener('click', function() {
+            if (errorWords.length === 0) {
+                alert('Нет ошибок для копирования');
+                return;
+            }
+            
+            const text = errorWords.join('\n');
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = this.textContent;
+                this.textContent = '✓ Скопировано!';
+                setTimeout(() => {
+                    this.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Ошибка копирования:', err);
+                alert('Не удалось скопировать');
+            });
+        });
+
         // Функция для отрисовки слов
         function renderWords() {
             wordsList.innerHTML = '';
@@ -285,21 +424,29 @@
                     row.classList.add('revealed');
                 }
                 
+                // Кнопка ошибки
+                const errorBtn = `<td class="word-cell error-btn" onclick="event.stopPropagation(); addError(${index});"><span class="error-icon">❌</span></td>`;
+                
                 if (mode === 'ar-ru') {
                     // АРБ → РУС: русский слева, арабский справа
                     row.innerHTML = `
+                        ${errorBtn}
                         <td class="word-cell russian ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ru}">${revealedWords[index] ? word.ru : ''}</td>
                         <td class="word-cell arabic">${word.ar}</td>
                     `;
                 } else {
                     // РУС → АРБ: русский слева, арабский справа
                     row.innerHTML = `
+                        ${errorBtn}
                         <td class="word-cell russian">${word.ru}</td>
                         <td class="word-cell arabic ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ar}">${revealedWords[index] ? word.ar : ''}</td>
                     `;
                 }
 
-                row.addEventListener('click', function() {
+                row.addEventListener('click', function(e) {
+                    // Игнорируем клик, если это была кнопка ошибки
+                    if (e.target.classList.contains('error-icon')) return;
+                    
                     const index = parseInt(this.dataset.index);
                     const hiddenCell = this.querySelector('.hidden');
                     
