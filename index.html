@@ -30,21 +30,21 @@
         h1 {
             text-align: center;
             color: #333;
-            margin-bottom: 30px;
-            font-size: 28px;
+            margin-bottom: 20px;
+            font-size: 24px;
         }
 
-        /* Toggle Switch */
+        /* Toggle Switch - меньше */
         .mode-toggle {
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-bottom: 30px;
-            gap: 15px;
+            margin-bottom: 25px;
+            gap: 10px;
         }
 
         .mode-label {
-            font-size: 16px;
+            font-size: 14px;
             color: #666;
             font-weight: 500;
         }
@@ -52,8 +52,8 @@
         .switch {
             position: relative;
             display: inline-block;
-            width: 60px;
-            height: 34px;
+            width: 44px;
+            height: 24px;
         }
 
         .switch input {
@@ -71,16 +71,16 @@
             bottom: 0;
             background-color: #ccc;
             transition: .4s;
-            border-radius: 34px;
+            border-radius: 24px;
         }
 
         .slider:before {
             position: absolute;
             content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
             background-color: white;
             transition: .4s;
             border-radius: 50%;
@@ -91,67 +91,66 @@
         }
 
         input:checked + .slider:before {
-            transform: translateX(26px);
+            transform: translateX(20px);
         }
 
-        /* Words List */
-        .word-item {
-            background: #fff;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 25px;
-            margin-bottom: 15px;
+        /* Words Table */
+        .words-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .word-row {
+            border-bottom: 1px solid #e0e0e0;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: background-color 0.2s ease;
         }
 
-        .word-item:hover {
-            border-color: #4CAF50;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        .word-row:hover {
+            background-color: #f9f9f9;
         }
 
-        .word-item.revealed {
-            background: #e8f5e9;
-            border-color: #4CAF50;
+        .word-row.revealed {
+            background-color: #e8f5e9;
         }
 
-        .word-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
+        .word-cell {
+            padding: 12px 15px;
+            font-size: 16px;
+            vertical-align: middle;
         }
 
-        .word-side {
-            font-size: 22px;
-            font-weight: 500;
-            white-space: nowrap;
-            overflow-x: auto;
-        }
-
-        .word-side.hidden {
-            color: transparent;
-            user-select: none;
-        }
-
-        .word-side.hidden::before {
-            content: '**********';
-            color: #999;
-            font-size: 22px;
-        }
-
-        .word-side.russian {
-            color: #2c3e50;
+        .word-cell.russian {
             text-align: left;
-            min-width: 150px;
+            color: #2c3e50;
+            width: 50%;
         }
 
-        .word-side.arabic {
+        .word-cell.arabic {
+            text-align: right;
             direction: rtl;
             color: #2c3e50;
-            text-align: right;
-            min-width: 150px;
-            font-size: 24px;
+            width: 50%;
+            font-size: 17px;
+        }
+
+        .word-cell.hidden {
+            color: transparent;
+            user-select: none;
+            position: relative;
+        }
+
+        .word-cell.hidden::before {
+            content: '**********';
+            color: #999;
+            position: absolute;
+            left: 15px;
+            font-size: 16px;
+        }
+
+        .word-cell.arabic.hidden::before {
+            left: auto;
+            right: 15px;
         }
 
         .hint {
@@ -159,30 +158,33 @@
             color: #666;
             margin-top: 20px;
             font-style: italic;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .loading {
             text-align: center;
             color: #666;
             padding: 40px;
-            font-size: 18px;
+            font-size: 16px;
         }
 
         /* Responsive */
         @media (max-width: 600px) {
-            .word-content {
-                flex-direction: column;
-                gap: 15px;
+            .container {
+                padding: 20px;
             }
-            
-            .word-side {
-                width: 100%;
-                text-align: center;
+
+            h1 {
+                font-size: 20px;
             }
-            
-            .word-side.arabic {
-                text-align: center;
+
+            .word-cell {
+                font-size: 15px;
+                padding: 10px;
+            }
+
+            .word-cell.arabic {
+                font-size: 16px;
             }
         }
     </style>
@@ -193,12 +195,12 @@
         
         <!-- Mode Toggle -->
         <div class="mode-toggle">
-            <span class="mode-label" id="mode-label-left">РУС → АРБ</span>
+            <span class="mode-label">АРБ → РУС</span>
             <label class="switch">
                 <input type="checkbox" id="mode-toggle">
                 <span class="slider"></span>
             </label>
-            <span class="mode-label" id="mode-label-right">АРБ → РУС</span>
+            <span class="mode-label">РУС → АРБ</span>
         </div>
 
         <div id="words-list">
@@ -212,14 +214,14 @@
 
     <script>
         let words = [];
-        let mode = 'ru-ar'; // 'ru-ar' или 'ar-ru'
+        let mode = 'ar-ru'; // Изначально АРБ → РУС
+        let revealedWords = []; // Массив для запоминания раскрытых слов
         const wordsList = document.getElementById('words-list');
         const modeToggle = document.getElementById('mode-toggle');
 
         // Функция для загрузки слов
         async function loadWords() {
             try {
-                // Просто указываем имя файла, если он рядом с index.html
                 const response = await fetch('words.txt');
                 
                 if (!response.ok) {
@@ -233,13 +235,9 @@
                 words = [];
                 
                 lines.forEach(line => {
-                    // Убираем пробелы по краям
                     line = line.trim();
-                    
-                    // Пропускаем пустые строки
                     if (!line) return;
                     
-                    // Разделяем по длинному тире —
                     const parts = line.split('—');
                     
                     if (parts.length >= 2) {
@@ -252,12 +250,15 @@
                     }
                 });
                 
+                // Инициализируем массив раскрытых слов
+                revealedWords = new Array(words.length).fill(false);
+                
                 console.log('Загружено слов:', words.length);
                 renderWords();
                 
             } catch (error) {
                 console.error('Ошибка загрузки слов:', error);
-                wordsList.innerHTML = '<div class="loading">❌ Ошибка загрузки слов. Убедитесь, что файл words.txt находится рядом с index.html</div>';
+                wordsList.innerHTML = '<div class="loading">❌ Ошибка загрузки слов</div>';
             }
         }
 
@@ -269,47 +270,59 @@
                 wordsList.innerHTML = '<div class="loading">Нет слов для отображения</div>';
                 return;
             }
+
+            // Создаем таблицу
+            const table = document.createElement('table');
+            table.className = 'words-table';
             
             words.forEach((word, index) => {
-                const wordItem = document.createElement('div');
-                wordItem.className = 'word-item';
-                wordItem.dataset.index = index;
+                const row = document.createElement('tr');
+                row.className = 'word-row';
+                row.dataset.index = index;
                 
-                if (mode === 'ru-ar') {
-                    // Показываем русский, скрываем арабский
-                    wordItem.innerHTML = `
-                        <div class="word-content">
-                            <span class="word-side russian">${word.ru}</span>
-                            <span class="word-side arabic hidden" data-text="${word.ar}"></span>
-                        </div>
+                // Если слово уже было раскрыто, добавляем класс revealed
+                if (revealedWords[index]) {
+                    row.classList.add('revealed');
+                }
+                
+                if (mode === 'ar-ru') {
+                    // Показываем арабский, скрываем русский
+                    row.innerHTML = `
+                        <td class="word-cell arabic">${word.ar}</td>
+                        <td class="word-cell russian ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ru}">${revealedWords[index] ? word.ru : ''}</td>
                     `;
                 } else {
-                    // Показываем арабский, скрываем русский
-                    wordItem.innerHTML = `
-                        <div class="word-content">
-                            <span class="word-side russian hidden" data-text="${word.ru}"></span>
-                            <span class="word-side arabic">${word.ar}</span>
-                        </div>
+                    // Показываем русский, скрываем арабский
+                    row.innerHTML = `
+                        <td class="word-cell russian">${word.ru}</td>
+                        <td class="word-cell arabic ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ar}">${revealedWords[index] ? word.ar : ''}</td>
                     `;
                 }
 
-                wordItem.addEventListener('click', function() {
-                    const hiddenElement = this.querySelector('.hidden');
-                    if (hiddenElement && hiddenElement.classList.contains('hidden')) {
-                        const text = hiddenElement.dataset.text;
-                        hiddenElement.classList.remove('hidden');
-                        hiddenElement.textContent = text;
+                row.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    const hiddenCell = this.querySelector('.hidden');
+                    
+                    if (hiddenCell) {
+                        const text = hiddenCell.dataset.text;
+                        hiddenCell.classList.remove('hidden');
+                        hiddenCell.textContent = text;
                         this.classList.add('revealed');
+                        
+                        // Запоминаем, что слово раскрыто
+                        revealedWords[index] = true;
                     }
                 });
 
-                wordsList.appendChild(wordItem);
+                table.appendChild(row);
             });
+
+            wordsList.appendChild(table);
         }
 
         // Переключение режима
         modeToggle.addEventListener('change', function() {
-            mode = this.checked ? 'ar-ru' : 'ru-ar';
+            mode = this.checked ? 'ru-ar' : 'ar-ru';
             renderWords();
         });
 
