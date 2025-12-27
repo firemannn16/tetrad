@@ -578,7 +578,6 @@
     <script>
         let words = [];
         let originalWords = [];
-        let initialWordCount = 0; // Количество слов при первой загрузке
         let mode = 'ar-ru';
         let revealedWords = [];
         let errorWords = [];
@@ -658,10 +657,24 @@
                 }
                 
                 const text = await response.text();
-                originalWords = parseWordsFromText(text);
-                initialWordCount = originalWords.length; // Сохраняем начальное количество
+                const allWordsFromFile = parseWordsFromText(text);
                 
-                console.log('✓ Загружено слов при старте:', initialWordCount);
+                // Проверяем, есть ли сохраненное количество слов в localStorage
+                const savedWordCount = localStorage.getItem('initialWordCount');
+                
+                if (savedWordCount === null) {
+                    // ПЕРВЫЙ ЗАПУСК - новый пользователь
+                    console.log('🆕 Первый запуск тренажера');
+                    originalWords = allWordsFromFile;
+                    localStorage.setItem('initialWordCount', allWordsFromFile.length);
+                    console.log(`Сохранено изначальное количество слов: ${allWordsFromFile.length}`);
+                } else {
+                    // ОБЫЧНАЯ ЗАГРУЗКА - берем только сохраненное количество
+                    const savedCount = parseInt(savedWordCount);
+                    console.log(`📂 Загрузка с сохраненным количеством: ${savedCount}`);
+                    originalWords = allWordsFromFile.slice(0, savedCount);
+                    console.log(`Загружено слов: ${originalWords.length} из ${allWordsFromFile.length} в файле`);
+                }
                 
                 if (originalWords.length === 0) {
                     throw new Error('Не удалось загрузить ни одного слова');
@@ -690,31 +703,34 @@
                 const text = await response.text();
                 const allWords = parseWordsFromText(text);
                 
-                console.log(`Всего слов в файле сейчас: ${allWords.length}`);
-                console.log(`Было изначально: ${initialWordCount}`);
+                const savedWordCount = parseInt(localStorage.getItem('initialWordCount') || '0');
                 
-                if (allWords.length <= initialWordCount) {
+                console.log(`Всего слов в файле: ${allWords.length}`);
+                console.log(`Было сохранено: ${savedWordCount}`);
+                
+                if (allWords.length <= savedWordCount) {
                     alert('Новых слов не найдено');
                     return;
                 }
                 
-                // Берем только новые слова (те что после initialWordCount)
-                const newWords = allWords.slice(initialWordCount);
+                // Берем только новые слова
+                const newWords = allWords.slice(savedWordCount);
                 console.log(`Найдено новых слов: ${newWords.length}`);
                 
-                // Добавляем новые слова в конец массива
+                // Добавляем новые слова в конец
                 newWords.forEach(word => {
                     words.push(word);
                     revealedWords.push(false);
                 });
                 
-                // Обновляем originalWords и initialWordCount
+                // Обновляем originalWords и сохраняем новое количество
                 originalWords = allWords;
-                initialWordCount = allWords.length;
+                localStorage.setItem('initialWordCount', allWords.length);
+                console.log(`✓ Обновлено сохраненное количество: ${allWords.length}`);
                 
                 updateStats();
                 
-                // Если мы не на последней странице, переходим на следующую
+                // Переходим на следующую страницу если есть
                 const totalPages = Math.ceil(words.length / wordsPerPage);
                 if (currentPage < totalPages - 1) {
                     currentPage++;
@@ -743,23 +759,45 @@
             resetModal.classList.remove('show');
         });
 
-        confirmResetBtn.addEventListener('click', function() {
-            // Полный сброс
-            words = shuffleArray(originalWords);
-            revealedWords = new Array(words.length).fill(false);
-            errorWords = [];
-            currentPage = 0;
-            
-            renderErrors();
-            updateStats();
-            renderWords();
-            
-            resetModal.classList.remove('show');
-            
-            console.log('Прогресс полностью сброшен!');
+        confirmResetBtn.addEventListener('click', async function() {
+            try {
+                // Загружаем ВСЕ слова из файла заново
+                const response = await fetch('words.txt');
+                if (!response.ok) {
+                    throw new Error('Не удалось загрузить файл');
+                }
+                
+                const text = await response.text();
+                const allWords = parseWordsFromText(text);
+                
+                console.log('🔄 СБРОС ПРОГРЕССА');
+                console.log(`Загружено всех слов из файла: ${allWords.length}`);
+                
+                // Обновляем originalWords и сохраняем новое количество
+                originalWords = allWords;
+                localStorage.setItem('initialWordCount', allWords.length);
+                
+                // Полный сброс
+                words = shuffleArray(originalWords);
+                revealedWords = new Array(words.length).fill(false);
+                errorWords = [];
+                currentPage = 0;
+                
+                renderErrors();
+                updateStats();
+                renderWords();
+                
+                resetModal.classList.remove('show');
+                
+                console.log('✓ Прогресс полностью сброшен!');
+                
+            } catch (error) {
+                console.error('Ошибка при сбросе:', error);
+                alert('Ошибка при сбросе прогресса');
+                resetModal.classList.remove('show');
+            }
         });
 
-        // Закрытие модального окна по клику вне его
         resetModal.addEventListener('click', function(e) {
             if (e.target === resetModal) {
                 resetModal.classList.remove('show');
