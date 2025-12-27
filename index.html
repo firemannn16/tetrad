@@ -34,7 +34,6 @@
             font-size: 24px;
         }
 
-        /* Toggle Switch */
         .mode-toggle {
             display: flex;
             justify-content: center;
@@ -94,7 +93,6 @@
             transform: translateX(20px);
         }
 
-        /* Stats */
         .stats {
             text-align: center;
             margin-bottom: 20px;
@@ -103,7 +101,6 @@
             font-weight: 500;
         }
 
-        /* Words Table */
         .words-table {
             width: 100%;
             border-collapse: collapse;
@@ -196,7 +193,6 @@
             font-size: 18px;
         }
 
-        /* Pagination */
         .pagination {
             text-align: center;
             margin-top: 30px;
@@ -229,7 +225,6 @@
             font-size: 14px;
         }
 
-        /* Action Buttons Section */
         .action-buttons {
             display: flex;
             gap: 10px;
@@ -239,7 +234,7 @@
 
         .action-btn {
             flex: 1;
-            min-width: 200px;
+            min-width: 150px;
             padding: 12px 20px;
             border: none;
             border-radius: 5px;
@@ -266,7 +261,22 @@
             background: #d32f2f;
         }
 
-        /* Modal */
+        .my-code-btn {
+            background: #9C27B0;
+        }
+
+        .my-code-btn:hover {
+            background: #7B1FA2;
+        }
+
+        .enter-code-btn {
+            background: #FF9800;
+        }
+
+        .enter-code-btn:hover {
+            background: #F57C00;
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -276,6 +286,12 @@
             width: 100%;
             height: 100%;
             background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         .modal.show {
@@ -288,13 +304,19 @@
             background-color: white;
             padding: 30px;
             border-radius: 10px;
-            max-width: 400px;
+            max-width: 450px;
             width: 90%;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
 
         .modal-title {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: bold;
             color: #333;
             margin-bottom: 15px;
@@ -304,14 +326,50 @@
         .modal-text {
             font-size: 16px;
             color: #666;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             text-align: center;
             line-height: 1.5;
+        }
+
+        .code-display {
+            background: #f0f0f0;
+            border: 3px dashed #2196F3;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .code-text {
+            font-size: 36px;
+            font-weight: bold;
+            color: #2196F3;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .code-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 24px;
+            text-align: center;
+            letter-spacing: 8px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+        }
+
+        .code-input:focus {
+            outline: none;
+            border-color: #2196F3;
         }
 
         .modal-buttons {
             display: flex;
             gap: 10px;
+            margin-top: 20px;
         }
 
         .modal-btn {
@@ -323,6 +381,24 @@
             font-size: 15px;
             font-weight: 500;
             transition: background 0.3s;
+        }
+
+        .modal-btn.primary {
+            background: #2196F3;
+            color: white;
+        }
+
+        .modal-btn.primary:hover {
+            background: #1976D2;
+        }
+
+        .modal-btn.secondary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .modal-btn.secondary:hover {
+            background: #45a049;
         }
 
         .modal-btn.cancel {
@@ -343,7 +419,6 @@
             background: #d32f2f;
         }
 
-        /* Errors Section */
         .errors-section {
             margin-top: 40px;
             padding: 20px;
@@ -458,6 +533,31 @@
             font-size: 16px;
         }
 
+        .sync-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            font-size: 12px;
+            color: #666;
+            display: none;
+        }
+
+        .sync-status.show {
+            display: block;
+        }
+
+        .sync-status.syncing {
+            color: #2196F3;
+        }
+
+        .sync-status.synced {
+            color: #4CAF50;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 20px;
@@ -506,6 +606,11 @@
             .copy-btn, .restore-btn {
                 width: 100%;
             }
+
+            .code-text {
+                font-size: 28px;
+                letter-spacing: 4px;
+            }
         }
     </style>
 </head>
@@ -539,13 +644,13 @@
             👉 Свайп вправо, чтобы отметить как ошибку
         </div>
 
-        <!-- Action Buttons -->
         <div class="action-buttons">
             <button class="action-btn add-words-btn" id="add-new-words-btn">Добавить новые слова</button>
+            <button class="action-btn my-code-btn" id="my-code-btn">Мой код</button>
+            <button class="action-btn enter-code-btn" id="enter-code-btn">Ввести код</button>
             <button class="action-btn reset-btn" id="reset-progress-btn">Сбросить прогресс</button>
         </div>
 
-        <!-- Errors Section -->
         <div class="errors-section">
             <div class="errors-header">
                 <span class="errors-title">Ошибки:</span>
@@ -560,7 +665,60 @@
         </div>
     </div>
 
-    <!-- Modal for Reset Confirmation -->
+    <div class="sync-status" id="sync-status">
+        ⏳ Синхронизация...
+    </div>
+
+    <div class="modal" id="welcome-modal">
+        <div class="modal-content">
+            <div class="modal-title">🎉 Добро пожаловать!</div>
+            <div class="modal-text">
+                Ваш уникальный код для синхронизации:<br>
+                <strong>Сохраните его!</strong>
+            </div>
+            <div class="code-display">
+                <div class="code-text" id="welcome-code">------</div>
+            </div>
+            <div class="modal-text" style="font-size: 14px; color: #999;">
+                С этим кодом вы сможете восстановить прогресс на любом устройстве
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" id="copy-welcome-code">Скопировать код</button>
+                <button class="modal-btn primary" id="start-learning">Начать обучение</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="show-code-modal">
+        <div class="modal-content">
+            <div class="modal-title">🔑 Ваш код</div>
+            <div class="code-display">
+                <div class="code-text" id="display-code">------</div>
+            </div>
+            <div class="modal-text" style="font-size: 14px; color: #999;">
+                Используйте этот код для входа на других устройствах
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" id="copy-code-btn">Скопировать</button>
+                <button class="modal-btn primary" id="close-code-modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="enter-code-modal">
+        <div class="modal-content">
+            <div class="modal-title">🔓 Введите код</div>
+            <div class="modal-text">
+                Введите ваш код для загрузки прогресса
+            </div>
+            <input type="text" class="code-input" id="code-input" placeholder="AB7K9M" maxlength="6">
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" id="cancel-enter-code">Отмена</button>
+                <button class="modal-btn primary" id="confirm-enter-code">Загрузить</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="reset-modal">
         <div class="modal-content">
             <div class="modal-title">⚠️ Подтверждение сброса</div>
@@ -575,14 +733,35 @@
         </div>
     </div>
 
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
     <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCs65we9V9cw9IHkar6D5LH5VSHlB3WHbY",
+            authDomain: "tetrad-3ae7e.firebaseapp.com",
+            projectId: "tetrad-3ae7e",
+            storageBucket: "tetrad-3ae7e.firebasestorage.app",
+            messagingSenderId: "397016124442",
+            appId: "1:397016124442:web:bf2fb9170d3d9e68c355a3",
+            measurementId: "G-CH0YW98L55"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         let words = [];
         let originalWords = [];
         let mode = 'ar-ru';
-        let revealedWords = [];
+        let openedWordsMap = {};
         let errorWords = [];
         let currentPage = 0;
         const wordsPerPage = 100;
+        let userCode = '';
+        let pendingSync = false;
+        let syncTimeout = null;
+
+        const PREFIX = 'arabicTrainer_';
         
         const wordsList = document.getElementById('words-list');
         const modeToggle = document.getElementById('mode-toggle');
@@ -591,17 +770,137 @@
         const copyErrorsBtn = document.getElementById('copy-errors-btn');
         const restoreWordsBtn = document.getElementById('restore-words-btn');
         const addNewWordsBtn = document.getElementById('add-new-words-btn');
+        const myCodeBtn = document.getElementById('my-code-btn');
+        const enterCodeBtn = document.getElementById('enter-code-btn');
         const resetProgressBtn = document.getElementById('reset-progress-btn');
         const nextPageBtn = document.getElementById('next-page-btn');
         const pageInfo = document.getElementById('page-info');
         const statsEl = document.getElementById('stats');
-        const resetModal = document.getElementById('reset-modal');
-        const cancelResetBtn = document.getElementById('cancel-reset-btn');
-        const confirmResetBtn = document.getElementById('confirm-reset-btn');
+        const syncStatus = document.getElementById('sync-status');
 
         let touchStartX = 0;
         let touchCurrentX = 0;
         let isSwiping = false;
+
+        function saveToLocalStorage(key, value) {
+            try {
+                localStorage.setItem(PREFIX + key, JSON.stringify(value));
+            } catch (e) {
+                console.error('Ошибка сохранения в localStorage:', e);
+            }
+        }
+
+        function getFromLocalStorage(key, defaultValue = null) {
+            try {
+                const item = localStorage.getItem(PREFIX + key);
+                return item ? JSON.parse(item) : defaultValue;
+            } catch (e) {
+                console.error('Ошибка чтения из localStorage:', e);
+                return defaultValue;
+            }
+        }
+
+        function removeFromLocalStorage(key) {
+            localStorage.removeItem(PREFIX + key);
+        }
+
+        function generateCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        function makeWordKey(word) {
+            return `${word.ru}_${word.ar}`;
+        }
+
+        function showSyncStatus(message, type = 'syncing') {
+            syncStatus.textContent = message;
+            syncStatus.className = `sync-status show ${type}`;
+            
+            setTimeout(() => {
+                syncStatus.classList.remove('show');
+            }, 2000);
+        }
+
+        async function syncToFirebase() {
+            if (!userCode) return;
+            
+            try {
+                const data = {
+                    code: userCode,
+                    initialWordCount: getFromLocalStorage('initialWordCount', 0),
+                    openedWords: openedWordsMap,
+                    errors: errorWords,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                await db.collection('users').doc(userCode).set(data, { merge: true });
+                saveToLocalStorage('lastSync', new Date().toISOString());
+                
+                console.log('✓ Синхронизировано с Firebase');
+                showSyncStatus('✓ Синхронизировано', 'synced');
+            } catch (error) {
+                console.error('Ошибка синхронизации с Firebase:', error);
+                showSyncStatus('❌ Ошибка синхронизации', 'error');
+            }
+        }
+
+        function scheduleSyncToFirebase() {
+            if (syncTimeout) clearTimeout(syncTimeout);
+            
+            pendingSync = true;
+            showSyncStatus('⏳ Ожидание синхронизации...', 'syncing');
+            
+            syncTimeout = setTimeout(() => {
+                if (pendingSync) {
+                    syncToFirebase();
+                    pendingSync = false;
+                }
+            }, 3000);
+        }
+
+        async function loadFromFirebase(code) {
+            try {
+                showSyncStatus('⏳ Загрузка из облака...', 'syncing');
+                
+                const doc = await db.collection('users').doc(code).get();
+                
+                if (doc.exists) {
+                    const data = doc.data();
+                    
+                    openedWordsMap = data.openedWords || {};
+                    errorWords = data.errors || [];
+                    
+                    const savedWordCount = data.initialWordCount || 0;
+                    saveToLocalStorage('initialWordCount', savedWordCount);
+                    
+                    saveToLocalStorage('openedWords', openedWordsMap);
+                    saveToLocalStorage('errors', errorWords);
+                    saveToLocalStorage('lastSync', new Date().toISOString());
+                    
+                    console.log('✓ Загружено из Firebase:', {
+                        openedWords: Object.keys(openedWordsMap).length,
+                        errors: errorWords.length,
+                        initialWordCount: savedWordCount
+                    });
+                    
+                    showSyncStatus('✓ Загружено из облака', 'synced');
+                    return true;
+                } else {
+                    console.log('Документ не найден, создаем новый');
+                    await syncToFirebase();
+                    return true;
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки из Firebase:', error);
+                showSyncStatus('❌ Ошибка загрузки', 'error');
+                return false;
+            }
+        }
 
         function shuffleArray(array) {
             const shuffled = [...array];
@@ -659,21 +958,15 @@
                 const text = await response.text();
                 const allWordsFromFile = parseWordsFromText(text);
                 
-                // Проверяем, есть ли сохраненное количество слов в localStorage
-                const savedWordCount = localStorage.getItem('initialWordCount');
+                const savedWordCount = getFromLocalStorage('initialWordCount', null);
                 
                 if (savedWordCount === null) {
-                    // ПЕРВЫЙ ЗАПУСК - новый пользователь
                     console.log('🆕 Первый запуск тренажера');
                     originalWords = allWordsFromFile;
-                    localStorage.setItem('initialWordCount', allWordsFromFile.length);
-                    console.log(`Сохранено изначальное количество слов: ${allWordsFromFile.length}`);
+                    saveToLocalStorage('initialWordCount', allWordsFromFile.length);
                 } else {
-                    // ОБЫЧНАЯ ЗАГРУЗКА - берем только сохраненное количество
-                    const savedCount = parseInt(savedWordCount);
-                    console.log(`📂 Загрузка с сохраненным количеством: ${savedCount}`);
-                    originalWords = allWordsFromFile.slice(0, savedCount);
-                    console.log(`Загружено слов: ${originalWords.length} из ${allWordsFromFile.length} в файле`);
+                    originalWords = allWordsFromFile.slice(0, savedWordCount);
+                    console.log(`📂 Загружено ${originalWords.length} из ${allWordsFromFile.length}`);
                 }
                 
                 if (originalWords.length === 0) {
@@ -681,7 +974,6 @@
                 }
                 
                 words = shuffleArray(originalWords);
-                revealedWords = new Array(words.length).fill(false);
                 
                 updateStats();
                 renderWords();
@@ -692,51 +984,181 @@
             }
         }
 
-        // Добавить новые слова
-        addNewWordsBtn.addEventListener('click', async function() {
+        async function initialize() {
+            userCode = getFromLocalStorage('userCode', '');
+            
+            if (!userCode) {
+                userCode = generateCode();
+                saveToLocalStorage('userCode', userCode);
+                
+                await loadWords();
+                
+                document.getElementById('welcome-code').textContent = userCode;
+                document.getElementById('welcome-modal').classList.add('show');
+                
+                await syncToFirebase();
+            } else {
+                console.log('👤 Код пользователя:', userCode);
+                
+                openedWordsMap = getFromLocalStorage('openedWords', {});
+                errorWords = getFromLocalStorage('errors', []);
+                
+                renderErrors();
+                
+                await loadWords();
+                
+                await loadFromFirebase(userCode);
+                
+                renderErrors();
+                updateStats();
+                renderWords();
+            }
+        }
+
+        document.getElementById('copy-welcome-code').addEventListener('click', function() {
+            const code = document.getElementById('welcome-code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                this.textContent = '✓ Скопировано!';
+                setTimeout(() => {
+                    this.textContent = 'Скопировать код';
+                }, 2000);
+            });
+        });
+
+        document.getElementById('start-learning').addEventListener('click', function() {
+            document.getElementById('welcome-modal').classList.remove('show');
+        });
+
+        myCodeBtn.addEventListener('click', function() {
+            document.getElementById('display-code').textContent = userCode;
+            document.getElementById('show-code-modal').classList.add('show');
+        });
+
+        document.getElementById('copy-code-btn').addEventListener('click', function() {
+            navigator.clipboard.writeText(userCode).then(() => {
+                this.textContent = '✓ Скопировано!';
+                setTimeout(() => {
+                    this.textContent = 'Скопировать';
+                }, 2000);
+            });
+        });
+
+        document.getElementById('close-code-modal').addEventListener('click', function() {
+            document.getElementById('show-code-modal').classList.remove('show');
+        });
+
+        enterCodeBtn.addEventListener('click', function() {
+            document.getElementById('code-input').value = '';
+            document.getElementById('enter-code-modal').classList.add('show');
+        });
+
+        document.getElementById('cancel-enter-code').addEventListener('click', function() {
+            document.getElementById('enter-code-modal').classList.remove('show');
+        });
+
+        document.getElementById('confirm-enter-code').addEventListener('click', async function() {
+            const inputCode = document.getElementById('code-input').value.trim().toUpperCase();
+            
+            if (inputCode.length !== 6) {
+                alert('Код должен содержать 6 символов');
+                return;
+            }
+            
+            userCode = inputCode;
+            saveToLocalStorage('userCode', userCode);
+            
+            const success = await loadFromFirebase(userCode);
+            
+            if (success) {
+                renderErrors();
+                updateStats();
+                renderWords();
+                
+                document.getElementById('enter-code-modal').classList.remove('show');
+                alert('✓ Прогресс загружен!');
+            } else {
+                alert('❌ Ошибка загрузки. Проверьте код и интернет-соединение.');
+            }
+        });
+
+        resetProgressBtn.addEventListener('click', function() {
+            document.getElementById('reset-modal').classList.add('show');
+        });
+
+        document.getElementById('cancel-reset-btn').addEventListener('click', function() {
+            document.getElementById('reset-modal').classList.remove('show');
+        });
+
+        document.getElementById('confirm-reset-btn').addEventListener('click', async function() {
             try {
                 const response = await fetch('words.txt');
-                if (!response.ok) {
-                    throw new Error('Не удалось загрузить файл');
-                }
+                if (!response.ok) throw new Error('Не удалось загрузить файл');
                 
                 const text = await response.text();
                 const allWords = parseWordsFromText(text);
                 
-                const savedWordCount = parseInt(localStorage.getItem('initialWordCount') || '0');
+                originalWords = allWords;
+                saveToLocalStorage('initialWordCount', allWords.length);
                 
-                console.log(`Всего слов в файле: ${allWords.length}`);
-                console.log(`Было сохранено: ${savedWordCount}`);
+                words = shuffleArray(originalWords);
+                openedWordsMap = {};
+                errorWords = [];
+                currentPage = 0;
+                
+                saveToLocalStorage('openedWords', openedWordsMap);
+                saveToLocalStorage('errors', errorWords);
+                
+                renderErrors();
+                updateStats();
+                renderWords();
+                
+                await syncToFirebase();
+                
+                document.getElementById('reset-modal').classList.remove('show');
+                
+                console.log('✓ Прогресс сброшен');
+                
+            } catch (error) {
+                console.error('Ошибка при сбросе:', error);
+                alert('Ошибка при сбросе прогресса');
+                document.getElementById('reset-modal').classList.remove('show');
+            }
+        });
+
+        addNewWordsBtn.addEventListener('click', async function() {
+            try {
+                const response = await fetch('words.txt');
+                if (!response.ok) throw new Error('Не удалось загрузить файл');
+                
+                const text = await response.text();
+                const allWords = parseWordsFromText(text);
+                
+                const savedWordCount = getFromLocalStorage('initialWordCount', 0);
                 
                 if (allWords.length <= savedWordCount) {
                     alert('Новых слов не найдено');
                     return;
                 }
                 
-                // Берем только новые слова
                 const newWords = allWords.slice(savedWordCount);
                 console.log(`Найдено новых слов: ${newWords.length}`);
                 
-                // Добавляем новые слова в конец
                 newWords.forEach(word => {
                     words.push(word);
-                    revealedWords.push(false);
                 });
                 
-                // Обновляем originalWords и сохраняем новое количество
                 originalWords = allWords;
-                localStorage.setItem('initialWordCount', allWords.length);
-                console.log(`✓ Обновлено сохраненное количество: ${allWords.length}`);
+                saveToLocalStorage('initialWordCount', allWords.length);
                 
                 updateStats();
                 
-                // Переходим на следующую страницу если есть
                 const totalPages = Math.ceil(words.length / wordsPerPage);
                 if (currentPage < totalPages - 1) {
                     currentPage++;
                 }
                 
                 renderWords();
+                scheduleSyncToFirebase();
                 
                 const originalText = this.textContent;
                 this.textContent = `✓ Добавлено ${newWords.length} слов!`;
@@ -750,69 +1172,14 @@
             }
         });
 
-        // Сброс прогресса
-        resetProgressBtn.addEventListener('click', function() {
-            resetModal.classList.add('show');
-        });
-
-        cancelResetBtn.addEventListener('click', function() {
-            resetModal.classList.remove('show');
-        });
-
-        confirmResetBtn.addEventListener('click', async function() {
-            try {
-                // Загружаем ВСЕ слова из файла заново
-                const response = await fetch('words.txt');
-                if (!response.ok) {
-                    throw new Error('Не удалось загрузить файл');
-                }
-                
-                const text = await response.text();
-                const allWords = parseWordsFromText(text);
-                
-                console.log('🔄 СБРОС ПРОГРЕССА');
-                console.log(`Загружено всех слов из файла: ${allWords.length}`);
-                
-                // Обновляем originalWords и сохраняем новое количество
-                originalWords = allWords;
-                localStorage.setItem('initialWordCount', allWords.length);
-                
-                // Полный сброс
-                words = shuffleArray(originalWords);
-                revealedWords = new Array(words.length).fill(false);
-                errorWords = [];
-                currentPage = 0;
-                
-                renderErrors();
-                updateStats();
-                renderWords();
-                
-                resetModal.classList.remove('show');
-                
-                console.log('✓ Прогресс полностью сброшен!');
-                
-            } catch (error) {
-                console.error('Ошибка при сбросе:', error);
-                alert('Ошибка при сбросе прогресса');
-                resetModal.classList.remove('show');
-            }
-        });
-
-        resetModal.addEventListener('click', function(e) {
-            if (e.target === resetModal) {
-                resetModal.classList.remove('show');
-            }
-        });
-
         function updateStats() {
             const total = words.length;
-            const completed = revealedWords.filter(r => r).length;
+            const completed = Object.keys(openedWordsMap).length;
             const remaining = total - completed;
             statsEl.textContent = `ВСЕГО: ${total}, ОСТАЛОСЬ ПРОЙТИ: ${remaining}`;
         }
 
-        function addError(index) {
-            const word = words[index];
+        function addError(word) {
             const errorEntry = {
                 word: { ru: word.ru, ar: word.ar },
                 text: `${word.ru} — ${word.ar}`
@@ -820,7 +1187,9 @@
             
             if (!errorWords.find(e => e.text === errorEntry.text)) {
                 errorWords.push(errorEntry);
+                saveToLocalStorage('errors', errorWords);
                 renderErrors();
+                scheduleSyncToFirebase();
             }
         }
 
@@ -847,9 +1216,6 @@
                 setTimeout(() => {
                     this.textContent = originalText;
                 }, 2000);
-            }).catch(err => {
-                console.error('Ошибка копирования:', err);
-                alert('Не удалось скопировать');
             });
         });
 
@@ -859,17 +1225,22 @@
                 return;
             }
             
-            console.log(`Возвращаем ${errorWords.length} слов на текущую страницу`);
+            console.log(`Возвращаем ${errorWords.length} слов`);
             
             errorWords.forEach(error => {
                 words.push(error.word);
-                revealedWords.push(false);
+                const key = makeWordKey(error.word);
+                delete openedWordsMap[key];
             });
             
             errorWords = [];
+            saveToLocalStorage('openedWords', openedWordsMap);
+            saveToLocalStorage('errors', errorWords);
+            
             renderErrors();
             updateStats();
             renderWords();
+            scheduleSyncToFirebase();
             
             const originalText = this.textContent;
             this.textContent = '✓ Возвращено!';
@@ -897,6 +1268,18 @@
             return '';
         }
 
+        function isWordOpened(word) {
+            const key = makeWordKey(word);
+            return openedWordsMap[key] === true;
+        }
+
+        function markWordAsOpened(word) {
+            const key = makeWordKey(word);
+            openedWordsMap[key] = true;
+            saveToLocalStorage('openedWords', openedWordsMap);
+            scheduleSyncToFirebase();
+        }
+
         function renderWords() {
             wordsList.innerHTML = '';
             
@@ -912,12 +1295,11 @@
             table.className = 'words-table';
             
             currentWords.forEach((word, idx) => {
-                const index = startIndex + idx;
                 const row = document.createElement('tr');
                 row.className = 'word-row';
-                row.dataset.index = index;
+                const isOpened = isWordOpened(word);
                 
-                if (revealedWords[index]) {
+                if (isOpened) {
                     row.classList.add('revealed');
                 }
                 
@@ -926,15 +1308,17 @@
                 
                 if (mode === 'ar-ru') {
                     row.innerHTML = `
-                        <td class="word-cell russian ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ru}">${revealedWords[index] ? formattedRu : ''}</td>
+                        <td class="word-cell russian ${isOpened ? '' : 'hidden'}" data-ru="${word.ru}">${isOpened ? formattedRu : ''}</td>
                         <td class="word-cell arabic ${arabicSizeClass}">${word.ar}</td>
                     `;
                 } else {
                     row.innerHTML = `
                         <td class="word-cell russian">${formattedRu}</td>
-                        <td class="word-cell arabic ${arabicSizeClass} ${revealedWords[index] ? '' : 'hidden'}" data-text="${word.ar}">${revealedWords[index] ? word.ar : ''}</td>
+                        <td class="word-cell arabic ${arabicSizeClass} ${isOpened ? '' : 'hidden'}" data-ar="${word.ar}">${isOpened ? word.ar : ''}</td>
                     `;
                 }
+
+                row.dataset.word = JSON.stringify(word);
 
                 row.addEventListener('touchstart', handleTouchStart, false);
                 row.addEventListener('touchmove', handleTouchMove, false);
@@ -943,21 +1327,23 @@
                 row.addEventListener('click', function(e) {
                     if (isSwiping) return;
                     
-                    const index = parseInt(this.dataset.index);
+                    const word = JSON.parse(this.dataset.word);
                     const hiddenCell = this.querySelector('.hidden');
                     
                     if (hiddenCell) {
-                        const text = hiddenCell.dataset.text;
-                        hiddenCell.classList.remove('hidden');
-                        
+                        let text;
                         if (hiddenCell.classList.contains('russian')) {
+                            text = hiddenCell.dataset.ru;
                             hiddenCell.innerHTML = formatRussian(text);
                         } else {
+                            text = hiddenCell.dataset.ar;
                             hiddenCell.textContent = text;
                         }
                         
+                        hiddenCell.classList.remove('hidden');
                         this.classList.add('revealed');
-                        revealedWords[index] = true;
+                        
+                        markWordAsOpened(word);
                         updateStats();
                     }
                 });
@@ -1027,8 +1413,8 @@
             const diff = touchCurrentX - touchStartX;
             
             if (diff > 100) {
-                const index = parseInt(this.dataset.index);
-                addError(index);
+                const word = JSON.parse(this.dataset.word);
+                addError(word);
                 
                 this.style.transform = 'translateX(150px)';
                 this.style.opacity = '0';
@@ -1064,7 +1450,7 @@
             renderWords();
         });
 
-        loadWords();
+        initialize();
     </script>
 </body>
 </html>
