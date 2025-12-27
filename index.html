@@ -448,10 +448,10 @@
 
     <script>
         let words = [];
-        let originalWords = []; // Оригинальный массив без перемешивания
-        let mode = 'ar-ru'; // Изначально АРБ → РУС
-        let revealedWords = []; // Массив для запоминания раскрытых слов
-        let errorWords = []; // Массив для хранения ошибок (с индексами)
+        let originalWords = [];
+        let mode = 'ar-ru';
+        let revealedWords = [];
+        let errorWords = [];
         let currentPage = 0;
         const wordsPerPage = 100;
         
@@ -465,12 +465,10 @@
         const pageInfo = document.getElementById('page-info');
         const statsEl = document.getElementById('stats');
 
-        // Свайп переменные
         let touchStartX = 0;
         let touchCurrentX = 0;
         let isSwiping = false;
 
-        // Функция для перемешивания массива (алгоритм Фишера-Йетса)
         function shuffleArray(array) {
             const shuffled = [...array];
             for (let i = shuffled.length - 1; i > 0; i--) {
@@ -480,7 +478,6 @@
             return shuffled;
         }
 
-        // Функция для поиска разделителя в строке
         function findSeparator(line) {
             if (line.includes(' — ')) return ' — ';
             if (line.includes('—')) return '—';
@@ -491,7 +488,6 @@
             return null;
         }
 
-        // Функция для загрузки слов
         async function loadWords() {
             try {
                 const response = await fetch('words.txt');
@@ -548,10 +544,7 @@
                     throw new Error('Не удалось загрузить ни одного слова');
                 }
                 
-                // Перемешиваем слова
                 words = shuffleArray(originalWords);
-                
-                // Инициализируем массив раскрытых слов
                 revealedWords = new Array(words.length).fill(false);
                 
                 console.log('Слова перемешаны!');
@@ -565,7 +558,6 @@
             }
         }
 
-        // Обновление статистики
         function updateStats() {
             const total = words.length;
             const completed = revealedWords.filter(r => r).length;
@@ -573,22 +565,19 @@
             statsEl.textContent = `ВСЕГО: ${total}, ОСТАЛОСЬ ПРОЙТИ: ${remaining}`;
         }
 
-        // Функция для добавления ошибки
         function addError(index) {
             const word = words[index];
             const errorEntry = {
-                index: index,
+                word: { ru: word.ru, ar: word.ar },
                 text: `${word.ru} — ${word.ar}`
             };
             
-            // Проверяем, нет ли уже такой ошибки по индексу
-            if (!errorWords.find(e => e.index === index)) {
+            if (!errorWords.find(e => e.text === errorEntry.text)) {
                 errorWords.push(errorEntry);
                 renderErrors();
             }
         }
 
-        // Функция для отрисовки ошибок
         function renderErrors() {
             if (errorWords.length === 0) {
                 errorsList.innerHTML = '<div class="no-errors">Ошибок пока нет</div>';
@@ -599,7 +588,6 @@
             }
         }
 
-        // Копирование ошибок в буфер обмена
         copyErrorsBtn.addEventListener('click', function() {
             if (errorWords.length === 0) {
                 alert('Нет ошибок для копирования');
@@ -619,43 +607,31 @@
             });
         });
 
-        // Вернуть слова из ошибок
+        // НОВАЯ ФУНКЦИЯ ВОЗВРАТА СЛОВ
         restoreWordsBtn.addEventListener('click', function() {
             if (errorWords.length === 0) {
                 alert('Нет ошибок для возврата');
                 return;
             }
             
-            // Сбрасываем revealed статус для всех ошибочных слов
+            console.log(`Возвращаем ${errorWords.length} слов на текущую страницу`);
+            
+            // Добавляем слова из ошибок в конец массива words
             errorWords.forEach(error => {
-                revealedWords[error.index] = false;
+                words.push(error.word);
+                revealedWords.push(false); // Добавляем в закрытом виде
             });
             
-            // Определяем на какую страницу добавлять
-            const startIndex = currentPage * wordsPerPage;
-            const endIndex = Math.min(startIndex + wordsPerPage, words.length);
-            const wordsOnCurrentPage = endIndex - startIndex;
-            const remainingSlots = wordsPerPage - wordsOnCurrentPage;
-            
-            console.log(`На текущей странице ${wordsOnCurrentPage} слов, свободно ${remainingSlots} мест`);
-            
-            if (errorWords.length <= remainingSlots) {
-                // Все ошибки помещаются на текущую страницу - просто перерисовываем
-                console.log('Все ошибки добавлены на текущую страницу');
-            } else {
-                // Часть на текущую, часть на следующую - переходим на следующую
-                if (currentPage < Math.ceil(words.length / wordsPerPage) - 1) {
-                    currentPage++;
-                    console.log('Перешли на следующую страницу');
-                }
-            }
+            console.log(`Теперь всего слов: ${words.length}`);
             
             // Очищаем список ошибок
             errorWords = [];
             renderErrors();
             
-            // Обновляем статистику и отображение
+            // Обновляем статистику (ОСТАЛОСЬ ПРОЙТИ увеличится)
             updateStats();
+            
+            // Перерисовываем текущую страницу
             renderWords();
             
             const originalText = this.textContent;
@@ -665,7 +641,6 @@
             }, 2000);
         });
 
-        // Функция для форматирования русского текста
         function formatRussian(text) {
             const parts = text.split(' - ');
             if (parts.length > 1) {
@@ -674,7 +649,6 @@
             return text;
         }
 
-        // Функция для определения класса размера арабского текста
         function getArabicSizeClass(text) {
             const separators = (text.match(/ - /g) || []).length;
             
@@ -686,7 +660,6 @@
             return '';
         }
 
-        // Функция для отрисовки слов
         function renderWords() {
             wordsList.innerHTML = '';
             
@@ -696,10 +669,10 @@
             }
 
             const startIndex = currentPage * wordsPerPage;
-            const endIndex = Math.min(startIndex + wordsPerPage, words.length);
-            const currentWords = words.slice(startIndex, endIndex);
+            // ВАЖНО: показываем ВСЕ слова от startIndex до конца (без ограничения endIndex)
+            const currentWords = words.slice(startIndex);
 
-            console.log(`Отображаем слова ${startIndex + 1}-${endIndex} из ${words.length}`);
+            console.log(`Отображаем ${currentWords.length} слов (от индекса ${startIndex})`);
 
             const table = document.createElement('table');
             table.className = 'words-table';
@@ -762,7 +735,6 @@
             updatePagination();
         }
 
-        // Обновление пагинации
         function updatePagination() {
             const totalPages = Math.ceil(words.length / wordsPerPage);
             const hasNextPage = (currentPage + 1) < totalPages;
@@ -775,8 +747,8 @@
             }
 
             const startIndex = currentPage * wordsPerPage + 1;
-            const endIndex = Math.min((currentPage + 1) * wordsPerPage, words.length);
-            pageInfo.textContent = `Страница ${currentPage + 1} из ${totalPages} (слова ${startIndex}-${endIndex})`;
+            const wordsOnPage = words.slice(currentPage * wordsPerPage).length;
+            pageInfo.textContent = `Страница ${currentPage + 1} из ${totalPages} (слов на странице: ${wordsOnPage})`;
         }
 
         nextPageBtn.addEventListener('click', function() {
