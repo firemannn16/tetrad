@@ -356,6 +356,39 @@
             return array;
         }
 
+        // ✅ НОВАЯ ФУНКЦИЯ: Парсинг строки с любыми видами тире
+        function parseLine(line) {
+            if (!line || !line.trim()) return null;
+            
+            // Находим первый арабский символ (диапазон Unicode для арабского)
+            const arabicMatch = line.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/);
+            if (!arabicMatch) return null;
+            
+            const arabicStart = line.indexOf(arabicMatch[0]);
+            
+            // Разделяем на русскую и арабскую части
+            let russianPart = line.substring(0, arabicStart);
+            let arabicPart = line.substring(arabicStart);
+            
+            // Убираем любые тире в конце русской части (все виды: -, –, —, ―)
+            russianPart = russianPart.replace(/[\s\-\–\—\―]+$/, '').trim();
+            arabicPart = arabicPart.trim();
+            
+            if (!russianPart || !arabicPart) return null;
+            
+            // Разбиваем на варианты (внутри используется обычный дефис с пробелами)
+            const russianVariants = russianPart.split(/\s*[-–—―]\s*/).map(p => p.trim()).filter(p => p);
+            const arabicVariants = arabicPart.split(/\s*-\s*/).map(p => p.trim()).filter(p => p);
+            
+            return {
+                russian: russianVariants,
+                arabic: arabicVariants,
+                id: line.trim(),
+                opened: false,
+                error: false
+            };
+        }
+
         async function saveToFirebase() {
             if (!userCode) return;
             
@@ -421,8 +454,6 @@
             if (userCode) {
                 const message = `🔑 ВАШ КОД:\n\n${userCode}\n\nСохраните его для входа с других устройств!`;
                 alert(message);
-                
-                // Копируем в буфер обмена
                 navigator.clipboard.writeText(userCode);
             }
         }
@@ -463,43 +494,26 @@
                 const initialWordCount = parseInt(localStorage.getItem('arabicTrainer_initialWordCount'));
                 
                 if (!initialWordCount) {
-                    // Проверяем - это новый пользователь или сброс прогресса?
                     const wasReset = localStorage.getItem('arabicTrainer_wasReset') === 'true';
                     
                     localStorage.setItem('arabicTrainer_initialWordCount', lines.length);
-                    allWords = lines.map(line => {
-                        const parts = line.split('—').map(p => p.trim());
-                        return {
-                            russian: parts[0].split('-').map(p => p.trim()),
-                            arabic: parts[1].split('-').map(p => p.trim()),
-                            id: line.trim(),
-                            opened: false,
-                            error: false
-                        };
-                    });
+                    
+                    // ✅ Используем новую функцию parseLine
+                    allWords = lines.map(line => parseLine(line)).filter(word => word !== null);
                     allWords = shuffle(allWords);
                     
-                    // Показываем код только для НОВОГО пользователя
                     if (!wasReset) {
                         document.getElementById('codeDisplay').style.display = 'block';
                         document.getElementById('codeValue').textContent = userCode;
                         isNewUser = true;
                     }
                     
-                    // Убираем флаг сброса
                     localStorage.removeItem('arabicTrainer_wasReset');
                 } else {
                     const wordsToLoad = lines.slice(0, initialWordCount);
-                    allWords = wordsToLoad.map(line => {
-                        const parts = line.split('—').map(p => p.trim());
-                        return {
-                            russian: parts[0].split('-').map(p => p.trim()),
-                            arabic: parts[1].split('-').map(p => p.trim()),
-                            id: line.trim(),
-                            opened: false,
-                            error: false
-                        };
-                    });
+                    
+                    // ✅ Используем новую функцию parseLine
+                    allWords = wordsToLoad.map(line => parseLine(line)).filter(word => word !== null);
                     allWords = shuffle(allWords);
                     
                     const openedWords = JSON.parse(localStorage.getItem('arabicTrainer_openedWords') || '{}');
@@ -717,16 +731,8 @@
                     return;
                 }
                 
-                const newWords = newWordsLines.map(line => {
-                    const parts = line.split('—').map(p => p.trim());
-                    return {
-                        russian: parts[0].split('-').map(p => p.trim()),
-                        arabic: parts[1].split('-').map(p => p.trim()),
-                        id: line.trim(),
-                        opened: false,
-                        error: false
-                    };
-                });
+                // ✅ Используем новую функцию parseLine
+                const newWords = newWordsLines.map(line => parseLine(line)).filter(word => word !== null);
                 
                 allWords = [...allWords, ...shuffle(newWords)];
                 localStorage.setItem('arabicTrainer_initialWordCount', lines.length);
@@ -749,22 +755,17 @@
         }
 
         async function resetProgress() {
-            // НЕ ГЕНЕРИРУЕМ НОВЫЙ КОД - используем существующий!
             const existingCode = userCode;
             
-            // Ставим флаг что это сброс (не новый пользователь)
             localStorage.setItem('arabicTrainer_wasReset', 'true');
             
-            // Полностью очищаем localStorage (кроме флага)
             const wasReset = localStorage.getItem('arabicTrainer_wasReset');
             localStorage.clear();
             localStorage.setItem('arabicTrainer_wasReset', wasReset);
             
-            // Сохраняем тот же код
             localStorage.setItem('arabicTrainer_userCode', existingCode);
             userCode = existingCode;
             
-            // Очищаем данные в Firebase под тем же кодом
             try {
                 await window.firestoreSetDoc(window.firestoreDoc(window.db, 'users', userCode), {
                     initialWordCount: 0,
@@ -781,7 +782,6 @@
             location.reload();
         }
 
-        // Автозагрузка при старте
         if (!localStorage.getItem('arabicTrainer_userCode')) {
             userCode = generateCode();
             localStorage.setItem('arabicTrainer_userCode', userCode);
