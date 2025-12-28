@@ -51,8 +51,8 @@
         .switch {
             position: relative;
             display: inline-block;
-            width: 44px;
-            height: 24px;
+            width: 48px;
+            height: 28px;
         }
 
         .switch input {
@@ -70,17 +70,17 @@
             bottom: 0;
             background-color: #ccc;
             transition: .4s;
-            border-radius: 24px;
+            border-radius: 28px;
         }
 
         .slider:before {
             position: absolute;
             content: "";
-            height: 18px;
-            width: 18px;
+            height: 22px;
+            width: 22px;
             left: 3px;
             bottom: 3px;
-            background-color: white;
+            background-color: #000;
             transition: .4s;
             border-radius: 50%;
         }
@@ -132,7 +132,7 @@
         }
 
         .word-cell {
-            padding: 12px 15px;
+            padding: 16px 15px;
             vertical-align: middle;
             word-wrap: break-word;
             overflow-wrap: break-word;
@@ -142,27 +142,25 @@
             text-align: left;
             color: #2c3e50;
             width: 50%;
-            font-size: 18px;
-            line-height: 1.4;
+            font-size: 20px;
+            line-height: 1.8;
         }
 
         .word-cell.arabic {
             text-align: right;
             direction: rtl;
             color: #2c3e50;
-            font-size: 24px;
+            font-size: 28px;
             width: 50%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            line-height: 1.6;
         }
 
         .word-cell.arabic.long-text {
-            font-size: 20px;
+            font-size: 24px;
         }
 
         .word-cell.arabic.very-long-text {
-            font-size: 18px;
+            font-size: 20px;
         }
 
         .word-cell.hidden {
@@ -176,21 +174,23 @@
             color: #999;
             position: absolute;
             left: 15px;
-            font-size: 18px;
+            font-size: 20px;
+            filter: blur(3px);
         }
 
         .word-cell.arabic.hidden::before {
             left: auto;
             right: 15px;
-            font-size: 24px;
+            font-size: 28px;
+            filter: blur(3px);
         }
 
         .word-cell.arabic.long-text.hidden::before {
-            font-size: 20px;
+            font-size: 24px;
         }
 
         .word-cell.arabic.very-long-text.hidden::before {
-            font-size: 18px;
+            font-size: 20px;
         }
 
         .pagination {
@@ -576,21 +576,21 @@
             }
 
             .word-cell.russian {
-                font-size: 17px;
-                padding: 10px 12px;
+                font-size: 18px;
+                padding: 12px;
             }
 
             .word-cell.arabic {
-                font-size: 22px;
-                padding: 10px 12px;
+                font-size: 24px;
+                padding: 12px;
             }
 
             .word-cell.arabic.long-text {
-                font-size: 19px;
+                font-size: 21px;
             }
 
             .word-cell.arabic.very-long-text {
-                font-size: 17px;
+                font-size: 18px;
             }
 
             .errors-header {
@@ -616,7 +616,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Тренажер арабских слов</h1>
+        <h1>🌙 Тренажер арабских слов</h1>
         
         <div class="mode-toggle">
             <span class="mode-text" id="mode-text">Формат: АРБ → РУС</span>
@@ -1250,10 +1250,15 @@
         });
 
         function formatRussian(text) {
-            const parts = text.split(' - ');
-            if (parts.length > 1) {
+            // Проверяем, есть ли дефисы для разделения
+            const hasSeparator = text.includes(' - ');
+            
+            if (hasSeparator) {
+                const parts = text.split(' - ');
+                // Объединяем через <br> для переноса строки
                 return parts.join('<br>');
             }
+            
             return text;
         }
 
