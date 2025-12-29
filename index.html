@@ -947,6 +947,74 @@
             return parsedWords;
         }
 
+        // Новая функция для проверки изменений
+        function validateProgress(currentWords) {
+            let changesDetected = false;
+            let removedCount = 0;
+            let changedCount = 0;
+            
+            // Создаем карту текущих слов для быстрого поиска
+            const currentWordsSet = new Set(currentWords.map(w => `${w.ru}|||${w.ar}`));
+            
+            // Проверяем openedWordsMap
+            const newOpenedWordsMap = {};
+            for (const [key, wordData] of Object.entries(openedWordsMap)) {
+                if (typeof wordData === 'object' && wordData.ru && wordData.ar) {
+                    // Проверяем, существует ли это слово в текущем списке
+                    const wordString = `${wordData.ru}|||${wordData.ar}`;
+                    if (currentWordsSet.has(wordString)) {
+                        // Слово не изменилось, сохраняем прогресс
+                        newOpenedWordsMap[key] = wordData;
+                    } else {
+                        // Слово изменилось или удалено
+                        changedCount++;
+                        changesDetected = true;
+                        console.log(`Слово изменено/удалено: ${wordData.ru} — ${wordData.ar}`);
+                    }
+                } else if (wordData === true) {
+                    // Старый формат (просто true), преобразуем в новый
+                    const parts = key.split('_');
+                    if (parts.length >= 2) {
+                        const ru = parts[0];
+                        const ar = parts.slice(1).join('_');
+                        const wordString = `${ru}|||${ar}`;
+                        if (currentWordsSet.has(wordString)) {
+                            newOpenedWordsMap[key] = { ru, ar };
+                        } else {
+                            changedCount++;
+                            changesDetected = true;
+                        }
+                    }
+                }
+            }
+            
+            // Проверяем errorWords
+            const newErrorWords = errorWords.filter(error => {
+                const wordString = `${error.word.ru}|||${error.word.ar}`;
+                const exists = currentWordsSet.has(wordString);
+                if (!exists) {
+                    removedCount++;
+                    changesDetected = true;
+                    console.log(`Ошибка удалена (слово не найдено): ${error.word.ru} — ${error.word.ar}`);
+                }
+                return exists;
+            });
+            
+            if (changesDetected) {
+                openedWordsMap = newOpenedWordsMap;
+                errorWords = newErrorWords;
+                
+                saveToLocalStorage('openedWords', openedWordsMap);
+                saveToLocalStorage('errors', errorWords);
+                
+                console.log(`🔄 Обнаружены изменения: ${changedCount} слов изменено/удалено из прогресса, ${removedCount} удалено из ошибок`);
+                
+                scheduleSyncToFirebase();
+            }
+            
+            return changesDetected;
+        }
+
         async function loadWords() {
             try {
                 const response = await fetch('words.txt');
@@ -967,6 +1035,9 @@
                 } else {
                     originalWords = allWordsFromFile.slice(0, savedWordCount);
                     console.log(`📂 Загружено ${originalWords.length} из ${allWordsFromFile.length}`);
+                    
+                    // Проверяем изменения в словах
+                    validateProgress(originalWords);
                 }
                 
                 if (originalWords.length === 0) {
@@ -1008,6 +1079,9 @@
                 await loadWords();
                 
                 await loadFromFirebase(userCode);
+                
+                // Повторная проверка после загрузки из Firebase
+                validateProgress(originalWords);
                 
                 renderErrors();
                 updateStats();
@@ -1070,6 +1144,7 @@
             const success = await loadFromFirebase(userCode);
             
             if (success) {
+                validateProgress(originalWords);
                 renderErrors();
                 updateStats();
                 renderWords();
@@ -1284,12 +1359,13 @@
 
         function isWordOpened(word) {
             const key = makeWordKey(word);
-            return openedWordsMap[key] === true;
+            return openedWordsMap[key] !== undefined;
         }
 
         function markWordAsOpened(word) {
             const key = makeWordKey(word);
-            openedWordsMap[key] = true;
+            // Теперь сохраняем полную информацию о слове
+            openedWordsMap[key] = { ru: word.ru, ar: word.ar };
             saveToLocalStorage('openedWords', openedWordsMap);
             scheduleSyncToFirebase();
         }
