@@ -947,32 +947,25 @@
             return parsedWords;
         }
 
-        // Новая функция для проверки изменений
         function validateProgress(currentWords) {
             let changesDetected = false;
             let removedCount = 0;
             let changedCount = 0;
             
-            // Создаем карту текущих слов для быстрого поиска
             const currentWordsSet = new Set(currentWords.map(w => `${w.ru}|||${w.ar}`));
             
-            // Проверяем openedWordsMap
             const newOpenedWordsMap = {};
             for (const [key, wordData] of Object.entries(openedWordsMap)) {
                 if (typeof wordData === 'object' && wordData.ru && wordData.ar) {
-                    // Проверяем, существует ли это слово в текущем списке
                     const wordString = `${wordData.ru}|||${wordData.ar}`;
                     if (currentWordsSet.has(wordString)) {
-                        // Слово не изменилось, сохраняем прогресс
                         newOpenedWordsMap[key] = wordData;
                     } else {
-                        // Слово изменилось или удалено
                         changedCount++;
                         changesDetected = true;
                         console.log(`Слово изменено/удалено: ${wordData.ru} — ${wordData.ar}`);
                     }
                 } else if (wordData === true) {
-                    // Старый формат (просто true), преобразуем в новый
                     const parts = key.split('_');
                     if (parts.length >= 2) {
                         const ru = parts[0];
@@ -988,7 +981,6 @@
                 }
             }
             
-            // Проверяем errorWords
             const newErrorWords = errorWords.filter(error => {
                 const wordString = `${error.word.ru}|||${error.word.ar}`;
                 const exists = currentWordsSet.has(wordString);
@@ -1036,7 +1028,6 @@
                     originalWords = allWordsFromFile.slice(0, savedWordCount);
                     console.log(`📂 Загружено ${originalWords.length} из ${allWordsFromFile.length}`);
                     
-                    // Проверяем изменения в словах
                     validateProgress(originalWords);
                 }
                 
@@ -1080,7 +1071,6 @@
                 
                 await loadFromFirebase(userCode);
                 
-                // Повторная проверка после загрузки из Firebase
                 validateProgress(originalWords);
                 
                 renderErrors();
@@ -1335,23 +1325,18 @@
             return text;
         }
 
-        function formatArabic(text) {
-            const separator = findSeparator(text);
+        function getArabicSizeClass(text) {
+            const allSeparators = [' — ', '—', ' – ', '–', ' - ', '-'];
+            let separatorCount = 0;
             
-            if (separator) {
-                const parts = text.split(separator);
-                return parts.join('<br>');
+            for (const sep of allSeparators) {
+                const matches = text.split(sep).length - 1;
+                separatorCount += matches;
             }
             
-            return text;
-        }
-
-        function getArabicSizeClass(text) {
-            const separators = (text.match(/ - /g) || []).length;
-            
-            if (separators >= 2) {
+            if (separatorCount >= 2) {
                 return 'very-long-text';
-            } else if (separators === 1) {
+            } else if (separatorCount === 1) {
                 return 'long-text';
             }
             return '';
@@ -1364,7 +1349,6 @@
 
         function markWordAsOpened(word) {
             const key = makeWordKey(word);
-            // Теперь сохраняем полную информацию о слове
             openedWordsMap[key] = { ru: word.ru, ar: word.ar };
             saveToLocalStorage('openedWords', openedWordsMap);
             scheduleSyncToFirebase();
@@ -1394,18 +1378,17 @@
                 }
                 
                 const formattedRu = formatRussian(word.ru);
-                const formattedAr = formatArabic(word.ar);
                 const arabicSizeClass = getArabicSizeClass(word.ar);
                 
                 if (mode === 'ar-ru') {
                     row.innerHTML = `
                         <td class="word-cell russian ${isOpened ? '' : 'hidden'}" data-ru="${word.ru}">${isOpened ? formattedRu : ''}</td>
-                        <td class="word-cell arabic ${arabicSizeClass}">${formattedAr}</td>
+                        <td class="word-cell arabic ${arabicSizeClass}">${word.ar}</td>
                     `;
                 } else {
                     row.innerHTML = `
                         <td class="word-cell russian">${formattedRu}</td>
-                        <td class="word-cell arabic ${arabicSizeClass} ${isOpened ? '' : 'hidden'}" data-ar="${word.ar}">${isOpened ? formattedAr : ''}</td>
+                        <td class="word-cell arabic ${arabicSizeClass} ${isOpened ? '' : 'hidden'}" data-ar="${word.ar}">${isOpened ? word.ar : ''}</td>
                     `;
                 }
 
@@ -1428,7 +1411,7 @@
                             hiddenCell.innerHTML = formatRussian(text);
                         } else {
                             text = hiddenCell.dataset.ar;
-                            hiddenCell.innerHTML = formatArabic(text);
+                            hiddenCell.textContent = text;
                         }
                         
                         hiddenCell.classList.remove('hidden');
