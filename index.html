@@ -1250,12 +1250,21 @@
         });
 
         function formatRussian(text) {
-            // Проверяем, есть ли дефисы для разделения
-            const hasSeparator = text.includes(' - ');
+            const separator = findSeparator(text);
             
-            if (hasSeparator) {
-                const parts = text.split(' - ');
-                // Объединяем через <br> для переноса строки
+            if (separator) {
+                const parts = text.split(separator);
+                return parts.join('<br>');
+            }
+            
+            return text;
+        }
+
+        function formatArabic(text) {
+            const separator = findSeparator(text);
+            
+            if (separator) {
+                const parts = text.split(separator);
                 return parts.join('<br>');
             }
             
@@ -1309,17 +1318,18 @@
                 }
                 
                 const formattedRu = formatRussian(word.ru);
+                const formattedAr = formatArabic(word.ar);
                 const arabicSizeClass = getArabicSizeClass(word.ar);
                 
                 if (mode === 'ar-ru') {
                     row.innerHTML = `
                         <td class="word-cell russian ${isOpened ? '' : 'hidden'}" data-ru="${word.ru}">${isOpened ? formattedRu : ''}</td>
-                        <td class="word-cell arabic ${arabicSizeClass}">${word.ar}</td>
+                        <td class="word-cell arabic ${arabicSizeClass}">${formattedAr}</td>
                     `;
                 } else {
                     row.innerHTML = `
                         <td class="word-cell russian">${formattedRu}</td>
-                        <td class="word-cell arabic ${arabicSizeClass} ${isOpened ? '' : 'hidden'}" data-ar="${word.ar}">${isOpened ? word.ar : ''}</td>
+                        <td class="word-cell arabic ${arabicSizeClass} ${isOpened ? '' : 'hidden'}" data-ar="${word.ar}">${isOpened ? formattedAr : ''}</td>
                     `;
                 }
 
@@ -1342,7 +1352,7 @@
                             hiddenCell.innerHTML = formatRussian(text);
                         } else {
                             text = hiddenCell.dataset.ar;
-                            hiddenCell.textContent = text;
+                            hiddenCell.innerHTML = formatArabic(text);
                         }
                         
                         hiddenCell.classList.remove('hidden');
