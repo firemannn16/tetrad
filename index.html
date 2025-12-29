@@ -132,7 +132,7 @@
         }
 
         .word-cell {
-            padding: 16px 15px;
+            padding: 20px 15px;
             vertical-align: middle;
             word-wrap: break-word;
             overflow-wrap: break-word;
@@ -142,7 +142,7 @@
             text-align: left;
             color: #2c3e50;
             width: 50%;
-            font-size: 20px;
+            font-size: 18px;
             line-height: 1.8;
         }
 
@@ -150,17 +150,18 @@
             text-align: right;
             direction: rtl;
             color: #2c3e50;
-            font-size: 28px;
+            font-size: 32px;
             width: 50%;
-            line-height: 1.6;
+            line-height: 2.2;
+            padding: 22px 15px;
         }
 
         .word-cell.arabic.long-text {
-            font-size: 26px;
+            font-size: 28px;
         }
 
         .word-cell.arabic.very-long-text {
-            font-size: 24px;
+            font-size: 26px;
         }
 
         .word-cell.hidden {
@@ -174,23 +175,23 @@
             color: #999;
             position: absolute;
             left: 15px;
-            font-size: 20px;
+            font-size: 18px;
             filter: blur(3px);
         }
 
         .word-cell.arabic.hidden::before {
             left: auto;
             right: 15px;
-            font-size: 28px;
+            font-size: 32px;
             filter: blur(3px);
         }
 
         .word-cell.arabic.long-text.hidden::before {
-            font-size: 26px;
+            font-size: 28px;
         }
 
         .word-cell.arabic.very-long-text.hidden::before {
-            font-size: 24px;
+            font-size: 26px;
         }
 
         .pagination {
@@ -576,21 +577,22 @@
             }
 
             .word-cell.russian {
-                font-size: 18px;
-                padding: 12px;
+                font-size: 16px;
+                padding: 18px 12px;
             }
 
             .word-cell.arabic {
-                font-size: 26px;
-                padding: 12px;
+                font-size: 30px;
+                padding: 20px 12px;
+                line-height: 2.2;
             }
 
             .word-cell.arabic.long-text {
-                font-size: 24px;
+                font-size: 27px;
             }
 
             .word-cell.arabic.very-long-text {
-                font-size: 22px;
+                font-size: 24px;
             }
 
             .errors-header {
@@ -1021,17 +1023,13 @@
                 const savedWordCount = getFromLocalStorage('initialWordCount', null);
                 
                 if (savedWordCount === null) {
-                    // Первый запуск - берем ВСЕ слова из файла
                     console.log('🆕 Первый запуск тренажера');
                     originalWords = allWordsFromFile;
                     saveToLocalStorage('initialWordCount', allWordsFromFile.length);
                 } else {
-                    // НЕ первый запуск - берем ТОЛЬКО сохраненное количество
-                    // Новые слова НЕ добавляются автоматически!
                     originalWords = allWordsFromFile.slice(0, savedWordCount);
                     console.log(`📂 Загружено ${originalWords.length} слов (сохранено: ${savedWordCount}, в файле: ${allWordsFromFile.length})`);
                     
-                    // Проверяем изменения только в существующих словах
                     validateProgress(originalWords);
                 }
                 
@@ -1075,8 +1073,6 @@
                 
                 await loadFromFirebase(userCode);
                 
-                // Повторная проверка после загрузки из Firebase
-                // Используем ТЕКУЩИЕ originalWords (без новых слов!)
                 validateProgress(originalWords);
                 
                 renderErrors();
@@ -1214,13 +1210,11 @@
                 const newWords = allWords.slice(savedWordCount);
                 console.log(`Найдено новых слов: ${newWords.length}`);
                 
-                // Добавляем новые слова в массивы
                 newWords.forEach(word => {
                     words.push(word);
                     originalWords.push(word);
                 });
                 
-                // Обновляем счетчик
                 saveToLocalStorage('initialWordCount', allWords.length);
                 
                 updateStats();
