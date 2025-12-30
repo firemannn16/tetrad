@@ -219,9 +219,20 @@
             text-align: center;
             margin-top: 30px;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
             gap: 15px;
+        }
+
+        .page-info {
+            color: #666;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .arrow-buttons {
+            display: flex;
+            gap: 10px;
         }
 
         .arrow-btn {
@@ -255,12 +266,6 @@
         .arrow-btn:disabled:hover {
             background: white;
             color: #ccc;
-        }
-
-        .page-info {
-            color: #666;
-            font-size: 14px;
-            min-width: 250px;
         }
 
         .action-buttons {
@@ -658,11 +663,6 @@
                 font-size: 28px;
                 letter-spacing: 4px;
             }
-
-            .pagination {
-                flex-direction: column;
-                gap: 10px;
-            }
         }
     </style>
 </head>
@@ -687,9 +687,11 @@
         </div>
 
         <div class="pagination">
-            <button class="arrow-btn" id="prev-page-btn" disabled>←</button>
             <div class="page-info" id="page-info"></div>
-            <button class="arrow-btn" id="next-page-btn" disabled>→</button>
+            <div class="arrow-buttons">
+                <button class="arrow-btn" id="prev-page-btn" disabled>←</button>
+                <button class="arrow-btn" id="next-page-btn" disabled>→</button>
+            </div>
         </div>
 
         <div class="hint">
@@ -782,6 +784,18 @@
             <div class="modal-buttons">
                 <button class="modal-btn cancel" id="cancel-reset-btn">Отмена</button>
                 <button class="modal-btn confirm" id="confirm-reset-btn">Да, сбросить</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="incomplete-page-modal">
+        <div class="modal-content">
+            <div class="modal-title">⚠️ Непройденные слова</div>
+            <div class="modal-text" id="incomplete-page-text">
+                На странице осталось непройденных слов
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn primary" id="go-to-incomplete-page">Перейти</button>
             </div>
         </div>
     </div>
@@ -897,6 +911,7 @@
                     openedWords: openedWordsMap,
                     errors: errorWords,
                     wordsOrder: words,
+                    currentPage: currentPage,
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
@@ -946,6 +961,10 @@
                         saveToLocalStorage('wordsOrder', words);
                     }
                     
+                    if (data.currentPage !== undefined) {
+                        saveToLocalStorage('currentPage', data.currentPage);
+                    }
+                    
                     saveToLocalStorage('openedWords', openedWordsMap);
                     saveToLocalStorage('errors', errorWords);
                     saveToLocalStorage('lastSync', new Date().toISOString());
@@ -954,7 +973,8 @@
                         openedWords: Object.keys(openedWordsMap).length,
                         errors: errorWords.length,
                         initialWordCount: savedWordCount,
-                        wordsCount: words.length
+                        wordsCount: words.length,
+                        currentPage: data.currentPage
                     });
                     
                     showSyncStatus('✓ Загружено из облака', 'synced');
@@ -1076,6 +1096,83 @@
             return changesDetected;
         }
 
+        function isPageCompleted(pageNumber) {
+            const startIdx = pageNumber * wordsPerPage;
+            const endIdx = Math.min(startIdx + wordsPerPage, words.length);
+            const pageWords = words.slice(startIdx, endIdx);
+            
+            for (const word of pageWords) {
+                const key = makeWordKey(word);
+                const isOpened = openedWordsMap[key] !== undefined;
+                const inErrors = errorWords.some(e => e.word.ru === word.ru && e.word.ar === word.ar);
+                
+                if (!isOpened && !inErrors) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+
+        function getIncompleteWordsCount(pageNumber) {
+            const startIdx = pageNumber * wordsPerPage;
+            const endIdx = Math.min(startIdx + wordsPerPage, words.length);
+            const pageWords = words.slice(startIdx, endIdx);
+            
+            let count = 0;
+            for (const word of pageWords) {
+                const key = makeWordKey(word);
+                const isOpened = openedWordsMap[key] !== undefined;
+                const inErrors = errorWords.some(e => e.word.ru === word.ru && e.word.ar === word.ar);
+                
+                if (!isOpened && !inErrors) {
+                    count++;
+                }
+            }
+            
+            return count;
+        }
+
+        function findFirstIncompletePage() {
+            const savedPage = getFromLocalStorage('currentPage', 0);
+            
+            for (let i = 0; i < savedPage; i++) {
+                if (!isPageCompleted(i)) {
+                    return i;
+                }
+            }
+            
+            return -1;
+        }
+
+        function checkAndShowIncompletePageModal() {
+            const savedPage = getFromLocalStorage('currentPage', 0);
+            
+            if (savedPage === 0) return;
+            
+            const incompletePage = findFirstIncompletePage();
+            
+            if (incompletePage !== -1) {
+                const incompleteCount = getIncompleteWordsCount(incompletePage);
+                
+                document.getElementById('incomplete-page-text').textContent = 
+                    `На странице ${incompletePage + 1} осталось ${incompleteCount} непройденных слов`;
+                
+                document.getElementById('incomplete-page-modal').classList.add('show');
+                
+                document.getElementById('go-to-incomplete-page').onclick = function() {
+                    currentPage = incompletePage;
+                    saveToLocalStorage('currentPage', currentPage);
+                    renderWords();
+                    document.getElementById('incomplete-page-modal').classList.remove('show');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+            } else {
+                currentPage = savedPage;
+                renderWords();
+            }
+        }
+
         async function loadWords() {
             try {
                 const response = await fetch('words.txt');
@@ -1096,6 +1193,7 @@
                     words = shuffleArray(allWordsFromFile);
                     saveToLocalStorage('initialWordCount', allWordsFromFile.length);
                     saveToLocalStorage('wordsOrder', words);
+                    saveToLocalStorage('currentPage', 0);
                 } else if (savedWordsOrder && savedWordsOrder.length > 0) {
                     console.log('📂 Загружаем сохраненный порядок слов');
                     words = savedWordsOrder;
@@ -1114,7 +1212,7 @@
                 }
                 
                 updateStats();
-                renderWords();
+                checkAndShowIncompletePageModal();
                 
             } catch (error) {
                 console.error('Ошибка загрузки слов:', error);
@@ -1151,7 +1249,7 @@
                 
                 renderErrors();
                 updateStats();
-                renderWords();
+                checkAndShowIncompletePageModal();
             }
         }
 
@@ -1213,7 +1311,7 @@
                 validateProgress(words);
                 renderErrors();
                 updateStats();
-                renderWords();
+                checkAndShowIncompletePageModal();
                 
                 document.getElementById('enter-code-modal').classList.remove('show');
                 alert('✓ Прогресс загружен!');
@@ -1243,6 +1341,7 @@
                 
                 saveToLocalStorage('initialWordCount', allWords.length);
                 saveToLocalStorage('wordsOrder', words);
+                saveToLocalStorage('currentPage', 0);
                 
                 openedWordsMap = {};
                 errorWords = [];
@@ -1560,14 +1659,18 @@
 
         nextPageBtn.addEventListener('click', function() {
             currentPage++;
+            saveToLocalStorage('currentPage', currentPage);
             renderWords();
+            scheduleSyncToFirebase();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
 
         prevPageBtn.addEventListener('click', function() {
             if (currentPage > 0) {
                 currentPage--;
+                saveToLocalStorage('currentPage', currentPage);
                 renderWords();
+                scheduleSyncToFirebase();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
         });
