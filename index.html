@@ -69,7 +69,7 @@
             right: 0;
             bottom: 0;
             background-color: #ccc;
-            transition: .4s;
+            transition: background-color .4s;
             border-radius: 28px;
         }
 
@@ -81,7 +81,7 @@
             left: 3px;
             bottom: 3px;
             background-color: #000;
-            transition: .4s;
+            transition: transform .4s;
             border-radius: 50%;
         }
 
@@ -110,7 +110,7 @@
         .word-row {
             border-bottom: 1px solid #e0e0e0;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: background-color 0.3s ease;
             position: relative;
             background: white;
         }
@@ -125,6 +125,7 @@
 
         .word-row.swiping {
             transition: none;
+            will-change: transform, opacity;
         }
 
         .word-row.error-swipe {
@@ -176,14 +177,12 @@
             position: absolute;
             left: 15px;
             font-size: 18px;
-            filter: blur(3px);
         }
 
         .word-cell.arabic.hidden::before {
             left: auto;
             right: 15px;
             font-size: 32px;
-            filter: blur(3px);
         }
 
         .word-cell.arabic.long-text.hidden::before {
@@ -763,6 +762,9 @@
         let pendingSync = false;
         let syncTimeout = null;
 
+        // Кэш для форматирования (оптимизация #4)
+        let formattedCache = new Map();
+
         const PREFIX = 'arabicTrainer_';
         
         const wordsList = document.getElementById('words-list');
@@ -780,9 +782,12 @@
         const statsEl = document.getElementById('stats');
         const syncStatus = document.getElementById('sync-status');
 
+        // Переменные для свайпа с requestAnimationFrame (оптимизация #8)
         let touchStartX = 0;
         let touchCurrentX = 0;
         let isSwiping = false;
+        let currentSwipeRow = null;
+        let rafId = null;
 
         function saveToLocalStorage(key, value) {
             try {
@@ -828,6 +833,7 @@
             }, 2000);
         }
 
+        // Оптимизация #5 - улучшенный дебаунсинг
         async function syncToFirebase() {
             if (!userCode) return;
             
@@ -852,10 +858,11 @@
         }
 
         function scheduleSyncToFirebase() {
-            if (syncTimeout) clearTimeout(syncTimeout);
+            if (syncTimeout) {
+                clearTimeout(syncTimeout);
+            }
             
             pendingSync = true;
-            showSyncStatus('⏳ Ожидание синхронизации...', 'syncing');
             
             syncTimeout = setTimeout(() => {
                 if (pendingSync) {
@@ -1217,6 +1224,9 @@
                 
                 saveToLocalStorage('initialWordCount', allWords.length);
                 
+                // Очищаем кэш форматирования
+                formattedCache.clear();
+                
                 updateStats();
                 
                 const totalPages = Math.ceil(words.length / wordsPerPage);
@@ -1316,15 +1326,24 @@
             }, 2000);
         });
 
+        // Оптимизация #4 - кэширование форматирования
         function formatRussian(text) {
+            if (formattedCache.has(text)) {
+                return formattedCache.get(text);
+            }
+            
             const separator = findSeparator(text);
+            let result;
             
             if (separator) {
                 const parts = text.split(separator);
-                return parts.join('<br>');
+                result = parts.join('<br>');
+            } else {
+                result = text;
             }
             
-            return text;
+            formattedCache.set(text, result);
+            return result;
         }
 
         function getArabicSizeClass(text) {
@@ -1356,6 +1375,7 @@
             scheduleSyncToFirebase();
         }
 
+        // Оптимизация #1 - Event Delegation для всех событий
         function renderWords() {
             wordsList.innerHTML = '';
             
@@ -1365,7 +1385,8 @@
             }
 
             const startIndex = currentPage * wordsPerPage;
-            const currentWords = words.slice(startIndex);
+            const endIndex = startIndex + wordsPerPage;
+            const currentWords = words.slice(startIndex, endIndex); // ИСПРАВЛЕНО: теперь показывает ровно 100 слов
 
             const table = document.createElement('table');
             table.className = 'words-table';
@@ -1382,6 +1403,9 @@
                 const formattedRu = formatRussian(word.ru);
                 const arabicSizeClass = getArabicSizeClass(word.ar);
                 
+                // Оптимизация #7 - хранить индекс вместо JSON
+                row.dataset.wordIndex = startIndex + idx;
+                
                 if (mode === 'ar-ru') {
                     row.innerHTML = `
                         <td class="word-cell russian ${isOpened ? '' : 'hidden'}" data-ru="${word.ru}">${isOpened ? formattedRu : ''}</td>
@@ -1393,36 +1417,6 @@
                         <td class="word-cell arabic ${arabicSizeClass} ${isOpened ? '' : 'hidden'}" data-ar="${word.ar}">${isOpened ? word.ar : ''}</td>
                     `;
                 }
-
-                row.dataset.word = JSON.stringify(word);
-
-                row.addEventListener('touchstart', handleTouchStart, false);
-                row.addEventListener('touchmove', handleTouchMove, false);
-                row.addEventListener('touchend', handleTouchEnd, false);
-
-                row.addEventListener('click', function(e) {
-                    if (isSwiping) return;
-                    
-                    const word = JSON.parse(this.dataset.word);
-                    const hiddenCell = this.querySelector('.hidden');
-                    
-                    if (hiddenCell) {
-                        let text;
-                        if (hiddenCell.classList.contains('russian')) {
-                            text = hiddenCell.dataset.ru;
-                            hiddenCell.innerHTML = formatRussian(text);
-                        } else {
-                            text = hiddenCell.dataset.ar;
-                            hiddenCell.textContent = text;
-                        }
-                        
-                        hiddenCell.classList.remove('hidden');
-                        this.classList.add('revealed');
-                        
-                        markWordAsOpened(word);
-                        updateStats();
-                    }
-                });
 
                 table.appendChild(row);
             });
@@ -1442,7 +1436,9 @@
                 nextPageBtn.style.display = 'none';
             }
 
-            const wordsOnPage = words.slice(currentPage * wordsPerPage).length;
+            const startIndex = currentPage * wordsPerPage;
+            const endIndex = Math.min(startIndex + wordsPerPage, words.length);
+            const wordsOnPage = endIndex - startIndex;
             pageInfo.textContent = `Страница ${currentPage + 1} из ${totalPages} (слов на странице: ${wordsOnPage})`;
         }
 
@@ -1452,36 +1448,81 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
 
-        function handleTouchStart(e) {
+        // Оптимизация #1 - Event Delegation на таблицу (клики)
+        wordsList.addEventListener('click', function(e) {
+            if (isSwiping) return;
+            
+            const row = e.target.closest('.word-row');
+            if (!row) return;
+            
+            // Оптимизация #7 - используем индекс вместо JSON.parse
+            const wordIndex = parseInt(row.dataset.wordIndex);
+            const word = words[wordIndex];
+            if (!word) return;
+            
+            const hiddenCell = row.querySelector('.hidden');
+            
+            if (hiddenCell) {
+                let text;
+                if (hiddenCell.classList.contains('russian')) {
+                    text = hiddenCell.dataset.ru;
+                    hiddenCell.innerHTML = formatRussian(text);
+                } else {
+                    text = hiddenCell.dataset.ar;
+                    hiddenCell.textContent = text;
+                }
+                
+                hiddenCell.classList.remove('hidden');
+                row.classList.add('revealed');
+                
+                markWordAsOpened(word);
+                updateStats();
+            }
+        });
+
+        // Оптимизация #1 + #8 - Event Delegation на таблицу (тачи с RAF)
+        wordsList.addEventListener('touchstart', function(e) {
+            const row = e.target.closest('.word-row');
+            if (!row) return;
+            
+            currentSwipeRow = row;
             touchStartX = e.touches[0].clientX;
             isSwiping = false;
-        }
+        }, { passive: true });
 
-        function handleTouchMove(e) {
-            if (!touchStartX) return;
+        wordsList.addEventListener('touchmove', function(e) {
+            if (!currentSwipeRow || !touchStartX) return;
             
             touchCurrentX = e.touches[0].clientX;
             const diff = touchCurrentX - touchStartX;
             
             if (Math.abs(diff) > 10) {
                 isSwiping = true;
-                this.classList.add('swiping');
+                currentSwipeRow.classList.add('swiping');
                 
-                if (diff > 0) {
-                    this.style.transform = `translateX(${diff}px)`;
-                    this.style.opacity = 1 - (diff / 200);
-                    
-                    if (diff > 50) {
-                        this.classList.add('error-swipe');
-                    } else {
-                        this.classList.remove('error-swipe');
+                // Оптимизация #8 - используем RAF для плавности
+                if (rafId) cancelAnimationFrame(rafId);
+                
+                rafId = requestAnimationFrame(() => {
+                    if (diff > 0) {
+                        currentSwipeRow.style.transform = `translateX(${diff}px)`;
+                        currentSwipeRow.style.opacity = 1 - (diff / 200);
+                        
+                        if (diff > 50) {
+                            currentSwipeRow.classList.add('error-swipe');
+                        } else {
+                            currentSwipeRow.classList.remove('error-swipe');
+                        }
                     }
-                }
+                });
             }
-        }
+        }, { passive: true });
 
-        function handleTouchEnd(e) {
+        wordsList.addEventListener('touchend', function(e) {
+            if (!currentSwipeRow) return;
+            
             if (!isSwiping) {
+                currentSwipeRow = null;
                 touchStartX = 0;
                 return;
             }
@@ -1489,30 +1530,36 @@
             const diff = touchCurrentX - touchStartX;
             
             if (diff > 100) {
-                const word = JSON.parse(this.dataset.word);
-                addError(word);
+                const wordIndex = parseInt(currentSwipeRow.dataset.wordIndex);
+                const word = words[wordIndex];
+                if (word) {
+                    addError(word);
+                }
                 
-                this.style.transform = 'translateX(150px)';
-                this.style.opacity = '0';
+                currentSwipeRow.style.transform = 'translateX(150px)';
+                currentSwipeRow.style.opacity = '0';
                 
                 setTimeout(() => {
-                    this.style.transform = '';
-                    this.style.opacity = '';
-                    this.classList.remove('swiping', 'error-swipe');
+                    if (currentSwipeRow) {
+                        currentSwipeRow.style.transform = '';
+                        currentSwipeRow.style.opacity = '';
+                        currentSwipeRow.classList.remove('swiping', 'error-swipe');
+                    }
                 }, 300);
             } else {
-                this.style.transform = '';
-                this.style.opacity = '';
-                this.classList.remove('swiping', 'error-swipe');
+                currentSwipeRow.style.transform = '';
+                currentSwipeRow.style.opacity = '';
+                currentSwipeRow.classList.remove('swiping', 'error-swipe');
             }
             
+            currentSwipeRow = null;
             touchStartX = 0;
             touchCurrentX = 0;
             
             setTimeout(() => {
                 isSwiping = false;
             }, 100);
-        }
+        }, { passive: true });
 
         modeToggle.addEventListener('change', function() {
             mode = this.checked ? 'ru-ar' : 'ar-ru';
