@@ -99,6 +99,11 @@
             font-size: 14px;
             color: #666;
             font-weight: 500;
+            border: 1px solid #333;
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: inline-block;
+            width: 100%;
         }
 
         .words-table {
@@ -213,33 +218,49 @@
         .pagination {
             text-align: center;
             margin-top: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
         }
 
-        .page-btn {
+        .arrow-btn {
+            background: white;
+            color: #2196F3;
+            border: 2px solid #2196F3;
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 24px;
+            font-weight: bold;
+            transition: all 0.3s;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .arrow-btn:hover {
             background: #2196F3;
             color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 500;
-            transition: background 0.3s;
         }
 
-        .page-btn:hover {
-            background: #1976D2;
-        }
-
-        .page-btn:disabled {
-            background: #ccc;
+        .arrow-btn:disabled {
+            border-color: #ccc;
+            color: #ccc;
             cursor: not-allowed;
         }
 
+        .arrow-btn:disabled:hover {
+            background: white;
+            color: #ccc;
+        }
+
         .page-info {
-            margin-top: 10px;
             color: #666;
             font-size: 14px;
+            min-width: 250px;
         }
 
         .action-buttons {
@@ -637,6 +658,11 @@
                 font-size: 28px;
                 letter-spacing: 4px;
             }
+
+            .pagination {
+                flex-direction: column;
+                gap: 10px;
+            }
         }
     </style>
 </head>
@@ -661,8 +687,9 @@
         </div>
 
         <div class="pagination">
-            <button class="page-btn" id="next-page-btn" style="display: none;">Перейти к следующим словам</button>
+            <button class="arrow-btn" id="prev-page-btn" disabled>←</button>
             <div class="page-info" id="page-info"></div>
+            <button class="arrow-btn" id="next-page-btn" disabled>→</button>
         </div>
 
         <div class="hint">
@@ -802,6 +829,7 @@
         const enterCodeBtn = document.getElementById('enter-code-btn');
         const resetProgressBtn = document.getElementById('reset-progress-btn');
         const nextPageBtn = document.getElementById('next-page-btn');
+        const prevPageBtn = document.getElementById('prev-page-btn');
         const pageInfo = document.getElementById('page-info');
         const statsEl = document.getElementById('stats');
         const syncStatus = document.getElementById('sync-status');
@@ -868,6 +896,7 @@
                     initialWordCount: getFromLocalStorage('initialWordCount', 0),
                     openedWords: openedWordsMap,
                     errors: errorWords,
+                    wordsOrder: words,
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
@@ -912,6 +941,11 @@
                     const savedWordCount = data.initialWordCount || 0;
                     saveToLocalStorage('initialWordCount', savedWordCount);
                     
+                    if (data.wordsOrder && data.wordsOrder.length > 0) {
+                        words = data.wordsOrder;
+                        saveToLocalStorage('wordsOrder', words);
+                    }
+                    
                     saveToLocalStorage('openedWords', openedWordsMap);
                     saveToLocalStorage('errors', errorWords);
                     saveToLocalStorage('lastSync', new Date().toISOString());
@@ -919,7 +953,8 @@
                     console.log('✓ Загружено из Firebase:', {
                         openedWords: Object.keys(openedWordsMap).length,
                         errors: errorWords.length,
-                        initialWordCount: savedWordCount
+                        initialWordCount: savedWordCount,
+                        wordsCount: words.length
                     });
                     
                     showSyncStatus('✓ Загружено из облака', 'synced');
@@ -1053,23 +1088,30 @@
                 const allWordsFromFile = parseWordsFromText(text);
                 
                 const savedWordCount = getFromLocalStorage('initialWordCount', null);
+                const savedWordsOrder = getFromLocalStorage('wordsOrder', null);
                 
                 if (savedWordCount === null) {
-                    console.log('🆕 Первый запуск тренажера');
+                    console.log('🆕 Первый запуск тренажера - перемешиваем слова');
                     originalWords = allWordsFromFile;
+                    words = shuffleArray(allWordsFromFile);
                     saveToLocalStorage('initialWordCount', allWordsFromFile.length);
-                } else {
+                    saveToLocalStorage('wordsOrder', words);
+                } else if (savedWordsOrder && savedWordsOrder.length > 0) {
+                    console.log('📂 Загружаем сохраненный порядок слов');
+                    words = savedWordsOrder;
                     originalWords = allWordsFromFile.slice(0, savedWordCount);
-                    console.log(`📂 Загружено ${originalWords.length} слов (сохранено: ${savedWordCount}, в файле: ${allWordsFromFile.length})`);
-                    
-                    validateProgress(originalWords);
+                } else {
+                    console.log('📂 Перемешиваем слова (нет сохраненного порядка)');
+                    originalWords = allWordsFromFile.slice(0, savedWordCount);
+                    words = shuffleArray(originalWords);
+                    saveToLocalStorage('wordsOrder', words);
                 }
                 
-                if (originalWords.length === 0) {
+                validateProgress(words);
+                
+                if (words.length === 0) {
                     throw new Error('Не удалось загрузить ни одного слова');
                 }
-                
-                words = shuffleArray(originalWords);
                 
                 updateStats();
                 renderWords();
@@ -1105,7 +1147,7 @@
                 
                 await loadFromFirebase(userCode);
                 
-                validateProgress(originalWords);
+                validateProgress(words);
                 
                 renderErrors();
                 updateStats();
@@ -1168,7 +1210,7 @@
             const success = await loadFromFirebase(userCode);
             
             if (success) {
-                validateProgress(originalWords);
+                validateProgress(words);
                 renderErrors();
                 updateStats();
                 renderWords();
@@ -1197,9 +1239,11 @@
                 const allWords = parseWordsFromText(text);
                 
                 originalWords = allWords;
-                saveToLocalStorage('initialWordCount', allWords.length);
+                words = shuffleArray(allWords);
                 
-                words = shuffleArray(originalWords);
+                saveToLocalStorage('initialWordCount', allWords.length);
+                saveToLocalStorage('wordsOrder', words);
+                
                 openedWordsMap = {};
                 errorWords = [];
                 currentPage = 0;
@@ -1242,22 +1286,19 @@
                 const newWords = allWords.slice(savedWordCount);
                 console.log(`Найдено новых слов: ${newWords.length}`);
                 
-                newWords.forEach(word => {
+                const shuffledNewWords = shuffleArray(newWords);
+                
+                shuffledNewWords.forEach(word => {
                     words.push(word);
                     originalWords.push(word);
                 });
                 
                 saveToLocalStorage('initialWordCount', allWords.length);
+                saveToLocalStorage('wordsOrder', words);
                 
                 formattedCache.clear();
                 
                 updateStats();
-                
-                const totalPages = Math.ceil(words.length / wordsPerPage);
-                if (currentPage < totalPages - 1) {
-                    currentPage++;
-                }
-                
                 renderWords();
                 scheduleSyncToFirebase();
                 
@@ -1326,17 +1367,40 @@
                 return;
             }
             
-            console.log(`Возвращаем ${errorWords.length} слов`);
+            console.log(`Возвращаем ${errorWords.length} слов на текущую страницу`);
+            
+            const visibleWords = getVisibleWords();
+            const currentPageEndIndex = Math.min((currentPage + 1) * wordsPerPage, visibleWords.length);
+            
+            let realIndex = 0;
+            let visibleCount = 0;
+            for (let i = 0; i < words.length; i++) {
+                if (!isWordInErrors(words[i])) {
+                    visibleCount++;
+                    if (visibleCount === currentPageEndIndex) {
+                        realIndex = i + 1;
+                        break;
+                    }
+                }
+            }
+            
+            if (realIndex === 0) {
+                realIndex = words.length;
+            }
+            
+            const wordsToRestore = errorWords.map(e => e.word);
+            words.splice(realIndex, 0, ...wordsToRestore);
             
             errorWords.forEach(error => {
-                words.push(error.word);
                 const key = makeWordKey(error.word);
                 delete openedWordsMap[key];
             });
             
             errorWords = [];
+            
             saveToLocalStorage('openedWords', openedWordsMap);
             saveToLocalStorage('errors', errorWords);
+            saveToLocalStorage('wordsOrder', words);
             
             renderErrors();
             updateStats();
@@ -1404,6 +1468,33 @@
             scheduleSyncToFirebase();
         }
 
+        function isWordInErrors(word) {
+            return errorWords.some(error => 
+                error.word.ru === word.ru && error.word.ar === word.ar
+            );
+        }
+
+        function getVisibleWords() {
+            const visibleWords = [];
+            const currentPageStart = currentPage * wordsPerPage;
+            const currentPageEnd = currentPageStart + wordsPerPage;
+            
+            for (let i = 0; i < words.length; i++) {
+                const word = words[i];
+                const globalIndex = visibleWords.length;
+                
+                if (isWordInErrors(word)) {
+                    if (globalIndex < currentPageStart || globalIndex >= currentPageEnd) {
+                        continue;
+                    }
+                }
+                
+                visibleWords.push({ word, originalIndex: i });
+            }
+            
+            return visibleWords;
+        }
+
         function renderWords() {
             wordsList.innerHTML = '';
             
@@ -1412,14 +1503,16 @@
                 return;
             }
 
+            const visibleWords = getVisibleWords();
             const startIndex = currentPage * wordsPerPage;
             const endIndex = startIndex + wordsPerPage;
-            const currentWords = words.slice(startIndex, endIndex);
+            const currentWords = visibleWords.slice(startIndex, endIndex);
 
             const table = document.createElement('table');
             table.className = 'words-table';
             
-            currentWords.forEach((word, idx) => {
+            currentWords.forEach((item) => {
+                const word = item.word;
                 const row = document.createElement('tr');
                 row.className = 'word-row';
                 const isOpened = isWordOpened(word);
@@ -1431,7 +1524,7 @@
                 const formattedRu = formatRussian(word.ru);
                 const arabicSizeClass = getArabicSizeClass(word.ar);
                 
-                row.dataset.wordIndex = startIndex + idx;
+                row.dataset.wordIndex = item.originalIndex;
                 
                 if (mode === 'ar-ru') {
                     row.innerHTML = `
@@ -1453,26 +1546,30 @@
         }
 
         function updatePagination() {
-            const totalPages = Math.ceil(words.length / wordsPerPage);
-            const hasNextPage = (currentPage + 1) < totalPages;
-
-            if (hasNextPage) {
-                nextPageBtn.style.display = 'inline-block';
-                nextPageBtn.disabled = false;
-            } else {
-                nextPageBtn.style.display = 'none';
-            }
+            const visibleWords = getVisibleWords();
+            const totalPages = Math.ceil(visibleWords.length / wordsPerPage);
+            
+            prevPageBtn.disabled = currentPage === 0;
+            nextPageBtn.disabled = (currentPage + 1) >= totalPages;
 
             const startIndex = currentPage * wordsPerPage;
-            const endIndex = Math.min(startIndex + wordsPerPage, words.length);
+            const endIndex = Math.min(startIndex + wordsPerPage, visibleWords.length);
             const wordsOnPage = endIndex - startIndex;
-            pageInfo.textContent = `Страница ${currentPage + 1} из ${totalPages} (слов на странице: ${wordsOnPage})`;
+            pageInfo.textContent = `Страница ${currentPage + 1} из ${totalPages} (слов: ${wordsOnPage})`;
         }
 
         nextPageBtn.addEventListener('click', function() {
             currentPage++;
             renderWords();
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        prevPageBtn.addEventListener('click', function() {
+            if (currentPage > 0) {
+                currentPage--;
+                renderWords();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         });
 
         wordsList.addEventListener('click', function(e) {
@@ -1576,7 +1673,6 @@
                     addError(word);
                 }
                 
-                // МГНОВЕННЫЙ ВОЗВРАТ БЕЗ ЗАДЕРЖКИ
                 if (currentSwipeRow) {
                     currentSwipeRow.style.transform = '';
                     currentSwipeRow.style.opacity = '';
@@ -1584,7 +1680,6 @@
                     currentSwipeRow.classList.remove('swiping', 'error-swipe');
                 }
             } else {
-                // Отменяем свайп
                 currentSwipeRow.style.transform = '';
                 currentSwipeRow.style.opacity = '';
                 currentSwipeRow.classList.remove('swiping', 'error-swipe');
