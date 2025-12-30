@@ -1380,7 +1380,6 @@
                 separatorCount += matches;
             }
             
-            // Более агрессивное уменьшение для длинных текстов
             if (textLength > 60 || separatorCount >= 4) {
                 return 'mega-long-text';
             } else if (textLength > 45 || separatorCount >= 3) {
@@ -1577,20 +1576,13 @@
                     addError(word);
                 }
                 
-                // Короткая анимация и полное удаление красного фона
-                currentSwipeRow.style.transition = 'transform 0.15s ease, opacity 0.15s ease';
-                currentSwipeRow.style.transform = 'translateX(80px)';
-                currentSwipeRow.style.opacity = '0.5';
-                
-                setTimeout(() => {
-                    if (currentSwipeRow) {
-                        // ПОЛНОСТЬЮ УБИРАЕМ ВСЁ
-                        currentSwipeRow.style.transform = '';
-                        currentSwipeRow.style.opacity = '';
-                        currentSwipeRow.style.transition = '';
-                        currentSwipeRow.classList.remove('swiping', 'error-swipe');
-                    }
-                }, 150);
+                // МГНОВЕННЫЙ ВОЗВРАТ БЕЗ ЗАДЕРЖКИ
+                if (currentSwipeRow) {
+                    currentSwipeRow.style.transform = '';
+                    currentSwipeRow.style.opacity = '';
+                    currentSwipeRow.style.transition = '';
+                    currentSwipeRow.classList.remove('swiping', 'error-swipe');
+                }
             } else {
                 // Отменяем свайп
                 currentSwipeRow.style.transform = '';
