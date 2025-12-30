@@ -115,25 +115,8 @@
             background: white;
         }
 
-        .word-row::before {
-            content: '☰';
-            position: absolute;
-            left: 8px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #ccc;
-            font-size: 20px;
-            opacity: 0.4;
-            pointer-events: none;
-            z-index: 1;
-        }
-
         .word-row:hover {
             background-color: #f9f9f9;
-        }
-
-        .word-row:hover::before {
-            opacity: 0.7;
         }
 
         .word-row.revealed {
@@ -162,7 +145,6 @@
             width: 50%;
             font-size: 18px;
             line-height: 1.8;
-            padding-left: 35px;
         }
 
         .word-cell.arabic {
@@ -193,7 +175,7 @@
             content: '**********';
             color: #999;
             position: absolute;
-            left: 35px;
+            left: 15px;
             font-size: 18px;
         }
 
@@ -595,7 +577,7 @@
 
             .word-cell.russian {
                 font-size: 16px;
-                padding: 18px 12px 18px 35px;
+                padding: 18px 12px;
             }
 
             .word-cell.arabic {
@@ -610,10 +592,6 @@
 
             .word-cell.arabic.very-long-text {
                 font-size: 24px;
-            }
-
-            .word-cell.hidden::before {
-                left: 35px;
             }
 
             .errors-header {
@@ -664,7 +642,7 @@
 
         <div class="hint">
             💡 Нажмите на строку, чтобы показать перевод<br>
-            👉 Тяните слово вправо от иконки ☰, чтобы отметить как ошибку
+            👉 Свайп вправо с левого края, чтобы отметить как ошибку
         </div>
 
         <div class="action-buttons">
@@ -803,7 +781,6 @@
         const statsEl = document.getElementById('stats');
         const syncStatus = document.getElementById('sync-status');
 
-        // Переменные для умного свайпа
         let touchStartX = 0;
         let touchStartY = 0;
         let touchCurrentX = 0;
@@ -1467,7 +1444,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
 
-        // Event Delegation для кликов
         wordsList.addEventListener('click', function(e) {
             if (isSwiping) return;
             
@@ -1498,7 +1474,6 @@
             }
         });
 
-        // УЛУЧШЕННЫЙ СВАЙП: только с левого края + проверка направления
         wordsList.addEventListener('touchstart', function(e) {
             const row = e.target.closest('.word-row');
             if (!row) return;
@@ -1507,12 +1482,10 @@
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
             
-            // Проверяем, начинается ли тач с левых 25% экрана
             const rowRect = row.getBoundingClientRect();
             const touchRelativeX = touchStartX - rowRect.left;
             const rowWidth = rowRect.width;
             
-            // Свайп разрешен только если начали с левых 25%
             isValidSwipeStart = (touchRelativeX / rowWidth) <= 0.25;
             
             isSwiping = false;
@@ -1527,7 +1500,6 @@
             const diffX = touchCurrentX - touchStartX;
             const diffY = touchCurrentY - touchStartY;
             
-            // Проверка направления: горизонтальное движение должно быть больше вертикального минимум в 2 раза
             const isHorizontal = Math.abs(diffX) > Math.abs(diffY) * 2;
             
             if (Math.abs(diffX) > 10 && isHorizontal) {
@@ -1566,10 +1538,6 @@
             const diffY = touchCurrentY - touchStartY;
             const isHorizontal = Math.abs(diffX) > Math.abs(diffY) * 2;
             
-            // Добавляем в ошибки только если: 
-            // 1) Начали с левого края
-            // 2) Движение горизонтальное
-            // 3) Протянули больше 120px
             if (diffX > 120 && isHorizontal && isValidSwipeStart) {
                 const wordIndex = parseInt(currentSwipeRow.dataset.wordIndex);
                 const word = words[wordIndex];
@@ -1577,16 +1545,19 @@
                     addError(word);
                 }
                 
-                currentSwipeRow.style.transform = 'translateX(150px)';
-                currentSwipeRow.style.opacity = '0';
+                // Быстрая анимация и возврат на место
+                currentSwipeRow.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+                currentSwipeRow.style.transform = 'translateX(100px)';
+                currentSwipeRow.style.opacity = '0.3';
                 
                 setTimeout(() => {
                     if (currentSwipeRow) {
                         currentSwipeRow.style.transform = '';
                         currentSwipeRow.style.opacity = '';
+                        currentSwipeRow.style.transition = '';
                         currentSwipeRow.classList.remove('swiping', 'error-swipe');
                     }
-                }, 300);
+                }, 200);
             } else {
                 currentSwipeRow.style.transform = '';
                 currentSwipeRow.style.opacity = '';
