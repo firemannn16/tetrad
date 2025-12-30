@@ -788,18 +788,6 @@
         </div>
     </div>
 
-    <div class="modal" id="incomplete-page-modal">
-        <div class="modal-content">
-            <div class="modal-title">⚠️ Непройденные слова</div>
-            <div class="modal-text" id="incomplete-page-text">
-                На странице осталось непройденных слов
-            </div>
-            <div class="modal-buttons">
-                <button class="modal-btn primary" id="go-to-incomplete-page">Перейти</button>
-            </div>
-        </div>
-    </div>
-
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
@@ -1096,83 +1084,6 @@
             return changesDetected;
         }
 
-        function isPageCompleted(pageNumber) {
-            const startIdx = pageNumber * wordsPerPage;
-            const endIdx = Math.min(startIdx + wordsPerPage, words.length);
-            const pageWords = words.slice(startIdx, endIdx);
-            
-            for (const word of pageWords) {
-                const key = makeWordKey(word);
-                const isOpened = openedWordsMap[key] !== undefined;
-                const inErrors = errorWords.some(e => e.word.ru === word.ru && e.word.ar === word.ar);
-                
-                if (!isOpened && !inErrors) {
-                    return false;
-                }
-            }
-            
-            return true;
-        }
-
-        function getIncompleteWordsCount(pageNumber) {
-            const startIdx = pageNumber * wordsPerPage;
-            const endIdx = Math.min(startIdx + wordsPerPage, words.length);
-            const pageWords = words.slice(startIdx, endIdx);
-            
-            let count = 0;
-            for (const word of pageWords) {
-                const key = makeWordKey(word);
-                const isOpened = openedWordsMap[key] !== undefined;
-                const inErrors = errorWords.some(e => e.word.ru === word.ru && e.word.ar === word.ar);
-                
-                if (!isOpened && !inErrors) {
-                    count++;
-                }
-            }
-            
-            return count;
-        }
-
-        function findFirstIncompletePage() {
-            const savedPage = getFromLocalStorage('currentPage', 0);
-            
-            for (let i = 0; i < savedPage; i++) {
-                if (!isPageCompleted(i)) {
-                    return i;
-                }
-            }
-            
-            return -1;
-        }
-
-        function checkAndShowIncompletePageModal() {
-            const savedPage = getFromLocalStorage('currentPage', 0);
-            
-            if (savedPage === 0) return;
-            
-            const incompletePage = findFirstIncompletePage();
-            
-            if (incompletePage !== -1) {
-                const incompleteCount = getIncompleteWordsCount(incompletePage);
-                
-                document.getElementById('incomplete-page-text').textContent = 
-                    `На странице ${incompletePage + 1} осталось ${incompleteCount} непройденных слов`;
-                
-                document.getElementById('incomplete-page-modal').classList.add('show');
-                
-                document.getElementById('go-to-incomplete-page').onclick = function() {
-                    currentPage = incompletePage;
-                    saveToLocalStorage('currentPage', currentPage);
-                    renderWords();
-                    document.getElementById('incomplete-page-modal').classList.remove('show');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                };
-            } else {
-                currentPage = savedPage;
-                renderWords();
-            }
-        }
-
         async function loadWords() {
             try {
                 const response = await fetch('words.txt');
@@ -1212,7 +1123,8 @@
                 }
                 
                 updateStats();
-                checkAndShowIncompletePageModal();
+                currentPage = getFromLocalStorage('currentPage', 0);
+                renderWords();
                 
             } catch (error) {
                 console.error('Ошибка загрузки слов:', error);
@@ -1249,7 +1161,8 @@
                 
                 renderErrors();
                 updateStats();
-                checkAndShowIncompletePageModal();
+                currentPage = getFromLocalStorage('currentPage', 0);
+                renderWords();
             }
         }
 
@@ -1311,7 +1224,8 @@
                 validateProgress(words);
                 renderErrors();
                 updateStats();
-                checkAndShowIncompletePageModal();
+                currentPage = getFromLocalStorage('currentPage', 0);
+                renderWords();
                 
                 document.getElementById('enter-code-modal').classList.remove('show');
                 alert('✓ Прогресс загружен!');
