@@ -155,14 +155,23 @@
             width: 50%;
             line-height: 2.2;
             padding: 22px 15px;
+            white-space: nowrap;
         }
 
         .word-cell.arabic.long-text {
-            font-size: 28px;
+            font-size: 24px;
         }
 
         .word-cell.arabic.very-long-text {
-            font-size: 26px;
+            font-size: 20px;
+        }
+
+        .word-cell.arabic.ultra-long-text {
+            font-size: 16px;
+        }
+
+        .word-cell.arabic.mega-long-text {
+            font-size: 14px;
         }
 
         .word-cell.hidden {
@@ -186,11 +195,19 @@
         }
 
         .word-cell.arabic.long-text.hidden::before {
-            font-size: 28px;
+            font-size: 24px;
         }
 
         .word-cell.arabic.very-long-text.hidden::before {
-            font-size: 26px;
+            font-size: 20px;
+        }
+
+        .word-cell.arabic.ultra-long-text.hidden::before {
+            font-size: 16px;
+        }
+
+        .word-cell.arabic.mega-long-text.hidden::before {
+            font-size: 14px;
         }
 
         .pagination {
@@ -581,17 +598,25 @@
             }
 
             .word-cell.arabic {
-                font-size: 30px;
+                font-size: 28px;
                 padding: 20px 12px;
                 line-height: 2.2;
             }
 
             .word-cell.arabic.long-text {
-                font-size: 27px;
+                font-size: 22px;
             }
 
             .word-cell.arabic.very-long-text {
-                font-size: 24px;
+                font-size: 18px;
+            }
+
+            .word-cell.arabic.ultra-long-text {
+                font-size: 15px;
+            }
+
+            .word-cell.arabic.mega-long-text {
+                font-size: 13px;
             }
 
             .errors-header {
@@ -1345,6 +1370,8 @@
         }
 
         function getArabicSizeClass(text) {
+            const textLength = text.replace(/\s/g, '').length;
+            
             const allSeparators = [' — ', '—', ' – ', '–', ' - ', '-'];
             let separatorCount = 0;
             
@@ -1353,9 +1380,14 @@
                 separatorCount += matches;
             }
             
-            if (separatorCount >= 2) {
+            // Более агрессивное уменьшение для длинных текстов
+            if (textLength > 60 || separatorCount >= 4) {
+                return 'mega-long-text';
+            } else if (textLength > 45 || separatorCount >= 3) {
+                return 'ultra-long-text';
+            } else if (textLength > 30 || separatorCount >= 2) {
                 return 'very-long-text';
-            } else if (separatorCount === 1) {
+            } else if (textLength > 15 || separatorCount >= 1) {
                 return 'long-text';
             }
             return '';
@@ -1545,20 +1577,22 @@
                     addError(word);
                 }
                 
-                // Быстрая анимация и возврат на место
-                currentSwipeRow.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
-                currentSwipeRow.style.transform = 'translateX(100px)';
-                currentSwipeRow.style.opacity = '0.3';
+                // Короткая анимация и полное удаление красного фона
+                currentSwipeRow.style.transition = 'transform 0.15s ease, opacity 0.15s ease';
+                currentSwipeRow.style.transform = 'translateX(80px)';
+                currentSwipeRow.style.opacity = '0.5';
                 
                 setTimeout(() => {
                     if (currentSwipeRow) {
+                        // ПОЛНОСТЬЮ УБИРАЕМ ВСЁ
                         currentSwipeRow.style.transform = '';
                         currentSwipeRow.style.opacity = '';
                         currentSwipeRow.style.transition = '';
                         currentSwipeRow.classList.remove('swiping', 'error-swipe');
                     }
-                }, 200);
+                }, 150);
             } else {
+                // Отменяем свайп
                 currentSwipeRow.style.transform = '';
                 currentSwipeRow.style.opacity = '';
                 currentSwipeRow.classList.remove('swiping', 'error-swipe');
