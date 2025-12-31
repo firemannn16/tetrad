@@ -1460,18 +1460,23 @@
             
             console.log(`Возвращаем ${errorWords.length} слов в конец текущей страницы`);
             
+            // Находим последнее видимое (не в ошибках) слово на текущей странице
             const visibleWords = getVisibleWords();
-            const endOfPageIndex = Math.min((currentPage + 1) * wordsPerPage, visibleWords.length);
+            const startIndex = currentPage * wordsPerPage;
+            const endIndex = Math.min(startIndex + wordsPerPage, visibleWords.length);
             
-            let realIndex = words.length;
+            let insertIndex = words.length; // По умолчанию - в конец всего массива
             
-            if (endOfPageIndex > 0 && endOfPageIndex <= visibleWords.length && visibleWords[endOfPageIndex - 1]) {
-                realIndex = visibleWords[endOfPageIndex - 1].originalIndex + 1;
+            // Если есть видимые слова на текущей странице, вставляем после последнего
+            if (endIndex > 0 && visibleWords[endIndex - 1]) {
+                insertIndex = visibleWords[endIndex - 1].originalIndex + 1;
             }
             
+            // Вставляем слова из ошибок после последнего слова текущей страницы
             const wordsToRestore = errorWords.map(e => e.word);
-            words.splice(realIndex, 0, ...wordsToRestore);
+            words.splice(insertIndex, 0, ...wordsToRestore);
             
+            // Удаляем из прогресса (делаем непройденными)
             errorWords.forEach(error => {
                 const key = makeWordKey(error.word);
                 delete openedWordsMap[key];
