@@ -1458,28 +1458,19 @@
                 return;
             }
             
-            console.log(`Возвращаем ${errorWords.length} слов в конец текущей страницы`);
+            console.log(`Возвращаем ${errorWords.length} слов в конец страницы ${currentPage + 1}`);
             
-            // Берем ВИДИМЫЕ слова текущей страницы (не в ошибках)
-            const visibleWords = getVisibleWords();
-            const startIndex = currentPage * wordsPerPage;
-            const endIndex = Math.min(startIndex + wordsPerPage, visibleWords.length);
+            // Находим реальный конец текущей страницы (не учитывая ошибки)
+            // Страница 6 = слова с индексами 500-599 (если по 100 на странице)
+            const pageEndIndex = Math.min((currentPage + 1) * wordsPerPage, words.length);
             
-            // Находим ПОСЛЕДНЕЕ ВИДИМОЕ слово на странице и берем его реальный индекс в массиве
-            let insertPosition = words.length; // по умолчанию в конец
-            
-            if (endIndex > 0 && visibleWords[endIndex - 1]) {
-                // Вставляем ПОСЛЕ последнего видимого слова страницы
-                insertPosition = visibleWords[endIndex - 1].originalIndex + 1;
-            }
-            
-            console.log(`Вставляем слова после позиции ${insertPosition - 1} (на позицию ${insertPosition})`);
+            console.log(`Вставляем слова после позиции ${pageEndIndex - 1} (на позицию ${pageEndIndex})`);
             
             // Копируем слова из ошибок
             const wordsToRestore = errorWords.map(e => e.word);
             
-            // Вставляем в массив после последнего видимого слова
-            words.splice(insertPosition, 0, ...wordsToRestore);
+            // Вставляем в конец текущей страницы
+            words.splice(pageEndIndex, 0, ...wordsToRestore);
             
             // Очищаем список ошибок (НЕ трогаем статус открыто/закрыто)
             errorWords = [];
@@ -1594,9 +1585,34 @@
             }
 
             const visibleWords = getVisibleWords();
-            const startIndex = currentPage * wordsPerPage;
-            const endIndex = startIndex + wordsPerPage;
-            const currentWords = visibleWords.slice(startIndex, endIndex);
+            const start = currentPage * wordsPerPage;
+            const pageEndIndex = (currentPage + 1) * wordsPerPage;
+
+            // Находим начальный индекс в visibleWords
+            const startIndexInVisible = visibleWords.findIndex(w => w.originalIndex >= start);
+            if (startIndexInVisible === -1) {
+                wordsList.innerHTML = '<div class="loading">На этой странице нет слов</div>';
+                return;
+            }
+
+            const currentWords = [];
+            let consecutiveCount = 0;
+
+            for (let i = startIndexInVisible; i < visibleWords.length; i++) {
+                const wordObj = visibleWords[i];
+                
+                if (wordObj.originalIndex < pageEndIndex) {
+                    currentWords.push(wordObj);
+                    consecutiveCount = 0;
+                } else {
+                    if (currentWords.length > 0 && consecutiveCount < 100) {
+                        currentWords.push(wordObj);
+                        consecutiveCount++;
+                    } else {
+                        break;
+                    }
+                }
+            }
 
             const table = document.createElement('table');
             table.className = 'words-table';
@@ -1642,9 +1658,29 @@
             prevPageBtn.disabled = currentPage === 0;
             nextPageBtn.disabled = (currentPage + 1) >= totalPages;
 
-            const startIndex = currentPage * wordsPerPage;
-            const endIndex = Math.min(startIndex + wordsPerPage, visibleWords.length);
-            const wordsOnPage = endIndex - startIndex;
+            const start = currentPage * wordsPerPage;
+            const pageEndIndex = (currentPage + 1) * wordsPerPage;
+            const startIndexInVisible = visibleWords.findIndex(w => w.originalIndex >= start);
+            
+            let wordsOnPage = 0;
+            if (startIndexInVisible !== -1) {
+                let consecutiveCount = 0;
+                for (let i = startIndexInVisible; i < visibleWords.length; i++) {
+                    const wordObj = visibleWords[i];
+                    if (wordObj.originalIndex < pageEndIndex) {
+                        wordsOnPage++;
+                        consecutiveCount = 0;
+                    } else {
+                        if (wordsOnPage > 0 && consecutiveCount < 100) {
+                            wordsOnPage++;
+                            consecutiveCount++;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+            
             pageInfo.textContent = `Страница ${currentPage + 1} из ${totalPages} (слов: ${wordsOnPage})`;
         }
 
