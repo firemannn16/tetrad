@@ -374,29 +374,6 @@
             line-height: 1.5;
         }
 
-        .dua-arabic {
-            font-size: 42px;
-            color: #2c3e50;
-            text-align: center;
-            direction: rtl;
-            margin: 25px 0;
-            line-height: 1.8;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 15px;
-            color: white;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-        }
-
-        .dua-translation {
-            font-size: 18px;
-            color: #555;
-            text-align: center;
-            font-style: italic;
-            margin-bottom: 25px;
-            line-height: 1.6;
-        }
-
         .code-display {
             background: #f0f0f0;
             border: 3px dashed #2196F3;
@@ -483,17 +460,6 @@
 
         .modal-btn.confirm:hover {
             background: #d32f2f;
-        }
-
-        .modal-btn.dua-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-size: 16px;
-            padding: 15px;
-        }
-
-        .modal-btn.dua-btn:hover {
-            background: linear-gradient(135deg, #5568d3 0%, #63408b 100%);
         }
 
         .errors-section {
@@ -697,15 +663,6 @@
                 font-size: 28px;
                 letter-spacing: 4px;
             }
-
-            .dua-arabic {
-                font-size: 32px;
-                padding: 15px;
-            }
-
-            .dua-translation {
-                font-size: 16px;
-            }
         }
     </style>
 </head>
@@ -765,17 +722,6 @@
 
     <div class="sync-status" id="sync-status">
         ⏳ Синхронизация...
-    </div>
-
-    <div class="modal" id="dua-modal">
-        <div class="modal-content">
-            <div class="modal-title">🤲 Сделаем дуа</div>
-            <div class="dua-arabic">رَّبِّ زِدْنِى عِلْمًۭا</div>
-            <div class="dua-translation">«Господь мой! Приумножь мои знания»</div>
-            <div class="modal-buttons">
-                <button class="modal-btn dua-btn" id="dua-done-btn">я сделал дуа</button>
-            </div>
-        </div>
     </div>
 
     <div class="modal" id="welcome-modal">
@@ -842,18 +788,6 @@
         </div>
     </div>
 
-    <div class="modal" id="incomplete-page-modal">
-        <div class="modal-content">
-            <div class="modal-title">⚠️ Непройденные слова</div>
-            <div class="modal-text" id="incomplete-page-text">
-                На странице осталось непройденных слов
-            </div>
-            <div class="modal-buttons">
-                <button class="modal-btn primary" id="go-to-incomplete-page">Перейти</button>
-            </div>
-        </div>
-    </div>
-
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
@@ -910,14 +844,6 @@
         let isValidSwipeStart = false;
         let currentSwipeRow = null;
         let rafId = null;
-
-        function showDuaModal() {
-            document.getElementById('dua-modal').classList.add('show');
-        }
-
-        document.getElementById('dua-done-btn').addEventListener('click', function() {
-            document.getElementById('dua-modal').classList.remove('show');
-        });
 
         function saveToLocalStorage(key, value) {
             try {
@@ -1158,83 +1084,6 @@
             return changesDetected;
         }
 
-        function isPageCompleted(pageNumber) {
-            const startIdx = pageNumber * wordsPerPage;
-            const endIdx = Math.min(startIdx + wordsPerPage, words.length);
-            const pageWords = words.slice(startIdx, endIdx);
-            
-            for (const word of pageWords) {
-                const key = makeWordKey(word);
-                const isOpened = openedWordsMap[key] !== undefined;
-                const inErrors = errorWords.some(e => e.word.ru === word.ru && e.word.ar === word.ar);
-                
-                if (!isOpened && !inErrors) {
-                    return false;
-                }
-            }
-            
-            return true;
-        }
-
-        function getIncompleteWordsCount(pageNumber) {
-            const startIdx = pageNumber * wordsPerPage;
-            const endIdx = Math.min(startIdx + wordsPerPage, words.length);
-            const pageWords = words.slice(startIdx, endIdx);
-            
-            let count = 0;
-            for (const word of pageWords) {
-                const key = makeWordKey(word);
-                const isOpened = openedWordsMap[key] !== undefined;
-                const inErrors = errorWords.some(e => e.word.ru === word.ru && e.word.ar === word.ar);
-                
-                if (!isOpened && !inErrors) {
-                    count++;
-                }
-            }
-            
-            return count;
-        }
-
-        function findFirstIncompletePage() {
-            const savedPage = getFromLocalStorage('currentPage', 0);
-            
-            for (let i = 0; i < savedPage; i++) {
-                if (!isPageCompleted(i)) {
-                    return i;
-                }
-            }
-            
-            return -1;
-        }
-
-        function checkAndShowIncompletePageModal() {
-            const savedPage = getFromLocalStorage('currentPage', 0);
-            
-            if (savedPage === 0) return;
-            
-            const incompletePage = findFirstIncompletePage();
-            
-            if (incompletePage !== -1) {
-                const incompleteCount = getIncompleteWordsCount(incompletePage);
-                
-                document.getElementById('incomplete-page-text').textContent = 
-                    `На странице ${incompletePage + 1} осталось ${incompleteCount} непройденных слов`;
-                
-                document.getElementById('incomplete-page-modal').classList.add('show');
-                
-                document.getElementById('go-to-incomplete-page').onclick = function() {
-                    currentPage = incompletePage;
-                    saveToLocalStorage('currentPage', currentPage);
-                    renderWords();
-                    document.getElementById('incomplete-page-modal').classList.remove('show');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                };
-            } else {
-                currentPage = savedPage;
-                renderWords();
-            }
-        }
-
         async function loadWords() {
             try {
                 const response = await fetch('words.txt');
@@ -1274,7 +1123,8 @@
                 }
                 
                 updateStats();
-                checkAndShowIncompletePageModal();
+                currentPage = getFromLocalStorage('currentPage', 0);
+                renderWords();
                 
             } catch (error) {
                 console.error('Ошибка загрузки слов:', error);
@@ -1283,8 +1133,6 @@
         }
 
         async function initialize() {
-            showDuaModal();
-            
             userCode = getFromLocalStorage('userCode', '');
             
             if (!userCode) {
@@ -1313,7 +1161,8 @@
                 
                 renderErrors();
                 updateStats();
-                checkAndShowIncompletePageModal();
+                currentPage = getFromLocalStorage('currentPage', 0);
+                renderWords();
             }
         }
 
@@ -1375,7 +1224,8 @@
                 validateProgress(words);
                 renderErrors();
                 updateStats();
-                checkAndShowIncompletePageModal();
+                currentPage = getFromLocalStorage('currentPage', 0);
+                renderWords();
                 
                 document.getElementById('enter-code-modal').classList.remove('show');
                 alert('✓ Прогресс загружен!');
@@ -1421,8 +1271,6 @@
                 await syncToFirebase();
                 
                 document.getElementById('reset-modal').classList.remove('show');
-                
-                showDuaModal();
                 
                 console.log('✓ Прогресс сброшен');
                 
