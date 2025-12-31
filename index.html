@@ -1460,31 +1460,28 @@
             
             console.log(`Возвращаем ${errorWords.length} слов в конец текущей страницы`);
             
-            // Находим последнее видимое (не в ошибках) слово на текущей странице
+            // Получаем все ВИДИМЫЕ слова (не в ошибках) на текущей странице
             const visibleWords = getVisibleWords();
-            const startIndex = currentPage * wordsPerPage;
-            const endIndex = Math.min(startIndex + wordsPerPage, visibleWords.length);
+            const startIdx = currentPage * wordsPerPage;
+            const endIdx = Math.min(startIdx + wordsPerPage, visibleWords.length);
             
-            let insertIndex = words.length; // По умолчанию - в конец всего массива
+            // Находим позицию для вставки - после последнего видимого слова на странице
+            let insertPosition = words.length; // по умолчанию в конец
             
-            // Если есть видимые слова на текущей странице, вставляем после последнего
-            if (endIndex > 0 && visibleWords[endIndex - 1]) {
-                insertIndex = visibleWords[endIndex - 1].originalIndex + 1;
+            if (endIdx > 0 && visibleWords[endIdx - 1]) {
+                // Берем реальный индекс последнего видимого слова страницы и вставляем после него
+                insertPosition = visibleWords[endIdx - 1].originalIndex + 1;
             }
             
-            // Вставляем слова из ошибок после последнего слова текущей страницы
+            console.log(`Вставляем на позицию ${insertPosition}`);
+            
+            // Копируем слова из ошибок и вставляем их в массив
             const wordsToRestore = errorWords.map(e => e.word);
-            words.splice(insertIndex, 0, ...wordsToRestore);
+            words.splice(insertPosition, 0, ...wordsToRestore);
             
-            // Удаляем из прогресса (делаем непройденными)
-            errorWords.forEach(error => {
-                const key = makeWordKey(error.word);
-                delete openedWordsMap[key];
-            });
-            
+            // Очищаем список ошибок (НЕ трогаем openedWordsMap - слова остаются открытыми/закрытыми)
             errorWords = [];
             
-            saveToLocalStorage('openedWords', openedWordsMap);
             saveToLocalStorage('errors', errorWords);
             saveToLocalStorage('wordsOrder', words);
             
