@@ -1458,25 +1458,15 @@
                 return;
             }
             
-            console.log(`Возвращаем ${errorWords.length} слов на текущую страницу`);
+            console.log(`Возвращаем ${errorWords.length} слов в конец текущей страницы`);
             
             const visibleWords = getVisibleWords();
-            const currentPageEndIndex = Math.min((currentPage + 1) * wordsPerPage, visibleWords.length);
+            const endOfPageIndex = Math.min((currentPage + 1) * wordsPerPage, visibleWords.length);
             
-            let realIndex = 0;
-            let visibleCount = 0;
-            for (let i = 0; i < words.length; i++) {
-                if (!isWordInErrors(words[i])) {
-                    visibleCount++;
-                    if (visibleCount === currentPageEndIndex) {
-                        realIndex = i + 1;
-                        break;
-                    }
-                }
-            }
+            let realIndex = words.length;
             
-            if (realIndex === 0) {
-                realIndex = words.length;
+            if (endOfPageIndex > 0 && endOfPageIndex <= visibleWords.length && visibleWords[endOfPageIndex - 1]) {
+                realIndex = visibleWords[endOfPageIndex - 1].originalIndex + 1;
             }
             
             const wordsToRestore = errorWords.map(e => e.word);
