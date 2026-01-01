@@ -878,6 +878,7 @@
         let errorWords = [];
         let currentPage = 0;
         const wordsPerPage = 100;
+        let pageWordCounts = {}; // НОВОЕ: хранит количество слов для каждой страницы
         let userCode = '';
         let pendingSync = false;
         let syncTimeout = null;
@@ -974,6 +975,7 @@
                     errors: errorWords,
                     wordsOrder: words,
                     currentPage: currentPage,
+                    pageWordCounts: pageWordCounts, // НОВОЕ: синхронизируем размеры страниц
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
@@ -1014,6 +1016,7 @@
                     
                     openedWordsMap = data.openedWords || {};
                     errorWords = data.errors || [];
+                    pageWordCounts = data.pageWordCounts || {}; // НОВОЕ: загружаем размеры страниц
                     
                     const savedWordCount = data.initialWordCount || 0;
                     saveToLocalStorage('initialWordCount', savedWordCount);
@@ -1029,6 +1032,7 @@
                     
                     saveToLocalStorage('openedWords', openedWordsMap);
                     saveToLocalStorage('errors', errorWords);
+                    saveToLocalStorage('pageWordCounts', pageWordCounts); // НОВОЕ: сохраняем размеры страниц
                     saveToLocalStorage('lastSync', new Date().toISOString());
                     
                     console.log('✓ Загружено из Firebase:', {
@@ -1036,7 +1040,8 @@
                         errors: errorWords.length,
                         initialWordCount: savedWordCount,
                         wordsCount: words.length,
-                        currentPage: data.currentPage
+                        currentPage: data.currentPage,
+                        pageWordCounts: pageWordCounts
                     });
                     
                     showSyncStatus('✓ Загружено из облака', 'synced');
@@ -1176,18 +1181,23 @@
                     console.log('🆕 Первый запуск тренажера - перемешиваем слова');
                     originalWords = allWordsFromFile;
                     words = shuffleArray(allWordsFromFile);
+                    pageWordCounts = {}; // НОВОЕ: сбрасываем размеры страниц
                     saveToLocalStorage('initialWordCount', allWordsFromFile.length);
                     saveToLocalStorage('wordsOrder', words);
+                    saveToLocalStorage('pageWordCounts', pageWordCounts);
                     saveToLocalStorage('currentPage', 0);
                 } else if (savedWordsOrder && savedWordsOrder.length > 0) {
                     console.log('📂 Загружаем сохраненный порядок слов');
                     words = savedWordsOrder;
                     originalWords = allWordsFromFile.slice(0, savedWordCount);
+                    pageWordCounts = getFromLocalStorage('pageWordCounts', {}); // НОВОЕ: загружаем размеры страниц
                 } else {
                     console.log('📂 Перемешиваем слова (нет сохраненного порядка)');
                     originalWords = allWordsFromFile.slice(0, savedWordCount);
                     words = shuffleArray(originalWords);
+                    pageWordCounts = {}; // НОВОЕ: сбрасываем размеры страниц
                     saveToLocalStorage('wordsOrder', words);
+                    saveToLocalStorage('pageWordCounts', pageWordCounts);
                 }
                 
                 validateProgress(words);
@@ -1226,6 +1236,7 @@
                 
                 openedWordsMap = getFromLocalStorage('openedWords', {});
                 errorWords = getFromLocalStorage('errors', []);
+                pageWordCounts = getFromLocalStorage('pageWordCounts', {}); // НОВОЕ: загружаем размеры страниц
                 
                 renderErrors();
                 
@@ -1336,9 +1347,11 @@
                 openedWordsMap = {};
                 errorWords = [];
                 currentPage = 0;
+                pageWordCounts = {}; // НОВОЕ: сбрасываем размеры страниц
                 
                 saveToLocalStorage('openedWords', openedWordsMap);
                 saveToLocalStorage('errors', errorWords);
+                saveToLocalStorage('pageWordCounts', pageWordCounts);
                 
                 renderErrors();
                 updateStats();
@@ -1452,38 +1465,43 @@
             });
         });
 
+        // НОВАЯ ФУНКЦИЯ: Возврат слов в конец текущей страницы
         restoreWordsBtn.addEventListener('click', function() {
             if (errorWords.length === 0) {
                 alert('Нет ошибок для возврата');
                 return;
             }
             
-            console.log(`Возвращаем ${errorWords.length} слов в конец страницы ${currentPage + 1}`);
+            console.log(`Возвращаем ${errorWords.length} слов в конец текущей страницы ${currentPage}`);
             
-            // Находим реальный конец текущей страницы (не учитывая ошибки)
-            // Страница 6 = слова с индексами 500-599 (если по 100 на странице)
-            const pageEndIndex = Math.min((currentPage + 1) * wordsPerPage, words.length);
+            // Вычисляем индекс последнего слова текущей страницы
+            const pageEndIndex = getPageEndIndex(currentPage);
             
-            console.log(`Вставляем слова после позиции ${pageEndIndex - 1} (на позицию ${pageEndIndex})`);
+            console.log(`Вставляем слова после позиции ${pageEndIndex}`);
             
             // Копируем слова из ошибок
             const wordsToRestore = errorWords.map(e => e.word);
             
-            // Вставляем в конец текущей страницы
-            words.splice(pageEndIndex, 0, ...wordsToRestore);
+            // Вставляем в массив после последнего слова текущей страницы
+            words.splice(pageEndIndex + 1, 0, ...wordsToRestore);
             
-            // Очищаем список ошибок (НЕ трогаем статус открыто/закрыто)
+            // Увеличиваем счетчик слов для текущей страницы
+            const currentCount = pageWordCounts[currentPage] || wordsPerPage;
+            pageWordCounts[currentPage] = currentCount + wordsToRestore.length;
+            
+            // Очищаем список ошибок
             errorWords = [];
             
             saveToLocalStorage('errors', errorWords);
             saveToLocalStorage('wordsOrder', words);
+            saveToLocalStorage('pageWordCounts', pageWordCounts);
             
             renderErrors();
             updateStats();
             renderWords();
             scheduleSyncToFirebase();
             
-            // Прокручиваем вниз, чтобы показать добавленные слова
+            // Прокручиваем вниз
             setTimeout(() => {
                 window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
             }, 100);
@@ -1494,6 +1512,38 @@
                 this.textContent = originalText;
             }, 2000);
         });
+
+        // НОВАЯ ФУНКЦИЯ: Получить индекс конца страницы
+        function getPageEndIndex(pageNum) {
+            let startIndex = 0;
+            
+            // Суммируем размеры всех предыдущих страниц
+            for (let i = 0; i < pageNum; i++) {
+                const pageSize = pageWordCounts[i] || wordsPerPage;
+                startIndex += pageSize;
+            }
+            
+            // Размер текущей страницы
+            const currentPageSize = pageWordCounts[pageNum] || wordsPerPage;
+            
+            // Конец текущей страницы
+            const endIndex = startIndex + currentPageSize - 1;
+            
+            // Не выходим за границы массива
+            return Math.min(endIndex, words.length - 1);
+        }
+
+        // НОВАЯ ФУНКЦИЯ: Получить начальный индекс страницы
+        function getPageStartIndex(pageNum) {
+            let startIndex = 0;
+            
+            for (let i = 0; i < pageNum; i++) {
+                const pageSize = pageWordCounts[i] || wordsPerPage;
+                startIndex += pageSize;
+            }
+            
+            return startIndex;
+        }
 
         function formatRussian(text) {
             if (formattedCache.has(text)) {
@@ -1555,27 +1605,23 @@
             );
         }
 
+        // ИЗМЕНЕННАЯ ФУНКЦИЯ: Получить видимые слова с учетом переменных размеров страниц
         function getVisibleWords() {
             const visibleWords = [];
-            const currentPageStart = currentPage * wordsPerPage;
-            const currentPageEnd = currentPageStart + wordsPerPage;
             
+            // Фильтруем слова, которые в ошибках (не показываем их)
             for (let i = 0; i < words.length; i++) {
                 const word = words[i];
-                const globalIndex = visibleWords.length;
                 
-                if (isWordInErrors(word)) {
-                    if (globalIndex < currentPageStart || globalIndex >= currentPageEnd) {
-                        continue;
-                    }
+                if (!isWordInErrors(word)) {
+                    visibleWords.push({ word, originalIndex: i });
                 }
-                
-                visibleWords.push({ word, originalIndex: i });
             }
             
             return visibleWords;
         }
 
+        // ИЗМЕНЕННАЯ ФУНКЦИЯ: Рендер слов с учетом переменных размеров страниц
         function renderWords() {
             wordsList.innerHTML = '';
             
@@ -1584,33 +1630,19 @@
                 return;
             }
 
-            const visibleWords = getVisibleWords();
-            const start = currentPage * wordsPerPage;
-            const pageEndIndex = (currentPage + 1) * wordsPerPage;
-
-            // Находим начальный индекс в visibleWords
-            const startIndexInVisible = visibleWords.findIndex(w => w.originalIndex >= start);
-            if (startIndexInVisible === -1) {
-                wordsList.innerHTML = '<div class="loading">На этой странице нет слов</div>';
-                return;
-            }
-
+            const startIndex = getPageStartIndex(currentPage);
+            const endIndex = getPageEndIndex(currentPage) + 1;
+            
+            console.log(`Страница ${currentPage}: индексы ${startIndex}-${endIndex-1}, слов: ${endIndex - startIndex}`);
+            
             const currentWords = [];
-            let consecutiveCount = 0;
-
-            for (let i = startIndexInVisible; i < visibleWords.length; i++) {
-                const wordObj = visibleWords[i];
+            
+            for (let i = startIndex; i < endIndex && i < words.length; i++) {
+                const word = words[i];
                 
-                if (wordObj.originalIndex < pageEndIndex) {
-                    currentWords.push(wordObj);
-                    consecutiveCount = 0;
-                } else {
-                    if (currentWords.length > 0 && consecutiveCount < 100) {
-                        currentWords.push(wordObj);
-                        consecutiveCount++;
-                    } else {
-                        break;
-                    }
+                // Пропускаем слова, которые в ошибках
+                if (!isWordInErrors(word)) {
+                    currentWords.push({ word, originalIndex: i });
                 }
             }
 
@@ -1651,35 +1683,26 @@
             updatePagination();
         }
 
+        // ИЗМЕНЕННАЯ ФУНКЦИЯ: Обновление пагинации с учетом переменных размеров страниц
         function updatePagination() {
-            const visibleWords = getVisibleWords();
-            const totalPages = Math.ceil(visibleWords.length / wordsPerPage);
+            // Вычисляем общее количество страниц
+            let totalPages = 0;
+            let accumulatedWords = 0;
+            let pageNum = 0;
+            
+            while (accumulatedWords < words.length) {
+                const pageSize = pageWordCounts[pageNum] || wordsPerPage;
+                accumulatedWords += pageSize;
+                totalPages++;
+                pageNum++;
+            }
             
             prevPageBtn.disabled = currentPage === 0;
             nextPageBtn.disabled = (currentPage + 1) >= totalPages;
 
-            const start = currentPage * wordsPerPage;
-            const pageEndIndex = (currentPage + 1) * wordsPerPage;
-            const startIndexInVisible = visibleWords.findIndex(w => w.originalIndex >= start);
-            
-            let wordsOnPage = 0;
-            if (startIndexInVisible !== -1) {
-                let consecutiveCount = 0;
-                for (let i = startIndexInVisible; i < visibleWords.length; i++) {
-                    const wordObj = visibleWords[i];
-                    if (wordObj.originalIndex < pageEndIndex) {
-                        wordsOnPage++;
-                        consecutiveCount = 0;
-                    } else {
-                        if (wordsOnPage > 0 && consecutiveCount < 100) {
-                            wordsOnPage++;
-                            consecutiveCount++;
-                        } else {
-                            break;
-                        }
-                    }
-                }
-            }
+            const startIndex = getPageStartIndex(currentPage);
+            const endIndex = getPageEndIndex(currentPage) + 1;
+            const wordsOnPage = Math.min(endIndex - startIndex, words.length - startIndex);
             
             pageInfo.textContent = `Страница ${currentPage + 1} из ${totalPages} (слов: ${wordsOnPage})`;
         }
