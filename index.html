@@ -882,6 +882,7 @@
         let userCode = '';
         let pendingSync = false;
         let syncTimeout = null;
+        let nextWordId = 0;
 
         let formattedCache = new Map();
 
@@ -911,6 +912,10 @@
         let isValidSwipeStart = false;
         let currentSwipeRow = null;
         let rafId = null;
+
+        function generateWordId() {
+            return `word_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
 
         function showDuaModal() {
             document.getElementById('dua-modal').classList.add('show');
@@ -951,10 +956,6 @@
             return code;
         }
 
-        function makeWordKey(word) {
-            return `${word.ru}_${word.ar}`;
-        }
-
         function showSyncStatus(message, type = 'syncing') {
             syncStatus.textContent = message;
             syncStatus.className = `sync-status show ${type}`;
@@ -976,6 +977,7 @@
                     wordsOrder: words,
                     currentPage: currentPage,
                     pageWordCounts: pageWordCounts,
+                    nextWordId: nextWordId,
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
@@ -1017,6 +1019,7 @@
                     openedWordsMap = data.openedWords || {};
                     errorWords = data.errors || [];
                     pageWordCounts = data.pageWordCounts || {};
+                    nextWordId = data.nextWordId || 0;
                     
                     const savedWordCount = data.initialWordCount || 0;
                     saveToLocalStorage('initialWordCount', savedWordCount);
@@ -1033,6 +1036,7 @@
                     saveToLocalStorage('openedWords', openedWordsMap);
                     saveToLocalStorage('errors', errorWords);
                     saveToLocalStorage('pageWordCounts', pageWordCounts);
+                    saveToLocalStorage('nextWordId', nextWordId);
                     saveToLocalStorage('lastSync', new Date().toISOString());
                     
                     console.log('✓ Загружено из Firebase:', {
@@ -1096,7 +1100,7 @@
                 const ar = parts.slice(1).join(separator).trim();
                 
                 if (ru && ar) {
-                    parsedWords.push({ ru, ar });
+                    parsedWords.push({ ru, ar, id: generateWordId() });
                 }
             });
             
@@ -1108,42 +1112,23 @@
             let removedCount = 0;
             let changedCount = 0;
             
-            const currentWordsSet = new Set(currentWords.map(w => `${w.ru}|||${w.ar}`));
+            const currentWordsIds = new Set(currentWords.map(w => w.id));
             
             const newOpenedWordsMap = {};
-            for (const [key, wordData] of Object.entries(openedWordsMap)) {
-                if (typeof wordData === 'object' && wordData.ru && wordData.ar) {
-                    const wordString = `${wordData.ru}|||${wordData.ar}`;
-                    if (currentWordsSet.has(wordString)) {
-                        newOpenedWordsMap[key] = wordData;
-                    } else {
-                        changedCount++;
-                        changesDetected = true;
-                        console.log(`Слово изменено/удалено: ${wordData.ru} — ${wordData.ar}`);
-                    }
-                } else if (wordData === true) {
-                    const parts = key.split('_');
-                    if (parts.length >= 2) {
-                        const ru = parts[0];
-                        const ar = parts.slice(1).join('_');
-                        const wordString = `${ru}|||${ar}`;
-                        if (currentWordsSet.has(wordString)) {
-                            newOpenedWordsMap[key] = { ru, ar };
-                        } else {
-                            changedCount++;
-                            changesDetected = true;
-                        }
-                    }
+            for (const [id, isOpened] of Object.entries(openedWordsMap)) {
+                if (currentWordsIds.has(id)) {
+                    newOpenedWordsMap[id] = isOpened;
+                } else {
+                    changedCount++;
+                    changesDetected = true;
                 }
             }
             
             const newErrorWords = errorWords.filter(error => {
-                const wordString = `${error.word.ru}|||${error.word.ar}`;
-                const exists = currentWordsSet.has(wordString);
+                const exists = currentWordsIds.has(error.word.id);
                 if (!exists) {
                     removedCount++;
                     changesDetected = true;
-                    console.log(`Ошибка удалена (слово не найдено): ${error.word.ru} — ${error.word.ar}`);
                 }
                 return exists;
             });
@@ -1176,6 +1161,7 @@
                 
                 const savedWordCount = getFromLocalStorage('initialWordCount', null);
                 const savedWordsOrder = getFromLocalStorage('wordsOrder', null);
+                nextWordId = getFromLocalStorage('nextWordId', 0);
                 
                 if (savedWordCount === null) {
                     console.log('🆕 Первый запуск тренажера - перемешиваем слова');
@@ -1185,10 +1171,16 @@
                     saveToLocalStorage('initialWordCount', allWordsFromFile.length);
                     saveToLocalStorage('wordsOrder', words);
                     saveToLocalStorage('pageWordCounts', pageWordCounts);
+                    saveToLocalStorage('nextWordId', nextWordId);
                     saveToLocalStorage('currentPage', 0);
                 } else if (savedWordsOrder && savedWordsOrder.length > 0) {
                     console.log('📂 Загружаем сохраненный порядок слов');
-                    words = savedWordsOrder;
+                    words = savedWordsOrder.map(w => {
+                        if (!w.id) {
+                            w.id = generateWordId();
+                        }
+                        return w;
+                    });
                     originalWords = allWordsFromFile.slice(0, savedWordCount);
                     pageWordCounts = getFromLocalStorage('pageWordCounts', {});
                 } else {
@@ -1237,6 +1229,7 @@
                 openedWordsMap = getFromLocalStorage('openedWords', {});
                 errorWords = getFromLocalStorage('errors', []);
                 pageWordCounts = getFromLocalStorage('pageWordCounts', {});
+                nextWordId = getFromLocalStorage('nextWordId', 0);
                 
                 renderErrors();
                 
@@ -1348,10 +1341,12 @@
                 errorWords = [];
                 currentPage = 0;
                 pageWordCounts = {};
+                nextWordId = 0;
                 
                 saveToLocalStorage('openedWords', openedWordsMap);
                 saveToLocalStorage('errors', errorWords);
                 saveToLocalStorage('pageWordCounts', pageWordCounts);
+                saveToLocalStorage('nextWordId', nextWordId);
                 
                 renderErrors();
                 updateStats();
@@ -1427,11 +1422,11 @@
 
         function addError(word) {
             const errorEntry = {
-                word: { ru: word.ru, ar: word.ar },
+                word: { ru: word.ru, ar: word.ar, id: word.id },
                 text: `${word.ru} — ${word.ar}`
             };
             
-            if (!errorWords.find(e => e.text === errorEntry.text)) {
+            if (!errorWords.find(e => e.word.id === word.id)) {
                 errorWords.push(errorEntry);
                 saveToLocalStorage('errors', errorWords);
                 renderErrors();
@@ -1477,12 +1472,12 @@
             
             console.log(`Вставляем слова после позиции ${pageEndIndex}`);
             
-            const wordsToRestore = errorWords.map(e => e.word);
-            
-            // НОВОЕ: Закрываем вернувшиеся слова (удаляем из openedWordsMap)
-            wordsToRestore.forEach(word => {
-                const key = makeWordKey(word);
-                delete openedWordsMap[key];
+            const wordsToRestore = errorWords.map(e => {
+                return {
+                    ru: e.word.ru,
+                    ar: e.word.ar,
+                    id: generateWordId()
+                };
             });
             
             words.splice(pageEndIndex + 1, 0, ...wordsToRestore);
@@ -1495,7 +1490,6 @@
             saveToLocalStorage('errors', errorWords);
             saveToLocalStorage('wordsOrder', words);
             saveToLocalStorage('pageWordCounts', pageWordCounts);
-            saveToLocalStorage('openedWords', openedWordsMap);
             
             renderErrors();
             updateStats();
@@ -1582,21 +1576,17 @@
         }
 
         function isWordOpened(word) {
-            const key = makeWordKey(word);
-            return openedWordsMap[key] !== undefined;
+            return openedWordsMap[word.id] === true;
         }
 
         function markWordAsOpened(word) {
-            const key = makeWordKey(word);
-            openedWordsMap[key] = { ru: word.ru, ar: word.ar };
+            openedWordsMap[word.id] = true;
             saveToLocalStorage('openedWords', openedWordsMap);
             scheduleSyncToFirebase();
         }
 
         function isWordInErrors(word) {
-            return errorWords.some(error => 
-                error.word.ru === word.ru && error.word.ar === word.ar
-            );
+            return errorWords.some(error => error.word.id === word.id);
         }
 
         function getVisibleWords() {
