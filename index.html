@@ -878,7 +878,7 @@
         let errorWords = [];
         let currentPage = 0;
         const wordsPerPage = 100;
-        let pageWordCounts = {}; // НОВОЕ: хранит количество слов для каждой страницы
+        let pageWordCounts = {};
         let userCode = '';
         let pendingSync = false;
         let syncTimeout = null;
@@ -975,7 +975,7 @@
                     errors: errorWords,
                     wordsOrder: words,
                     currentPage: currentPage,
-                    pageWordCounts: pageWordCounts, // НОВОЕ: синхронизируем размеры страниц
+                    pageWordCounts: pageWordCounts,
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
@@ -1016,7 +1016,7 @@
                     
                     openedWordsMap = data.openedWords || {};
                     errorWords = data.errors || [];
-                    pageWordCounts = data.pageWordCounts || {}; // НОВОЕ: загружаем размеры страниц
+                    pageWordCounts = data.pageWordCounts || {};
                     
                     const savedWordCount = data.initialWordCount || 0;
                     saveToLocalStorage('initialWordCount', savedWordCount);
@@ -1032,7 +1032,7 @@
                     
                     saveToLocalStorage('openedWords', openedWordsMap);
                     saveToLocalStorage('errors', errorWords);
-                    saveToLocalStorage('pageWordCounts', pageWordCounts); // НОВОЕ: сохраняем размеры страниц
+                    saveToLocalStorage('pageWordCounts', pageWordCounts);
                     saveToLocalStorage('lastSync', new Date().toISOString());
                     
                     console.log('✓ Загружено из Firebase:', {
@@ -1181,7 +1181,7 @@
                     console.log('🆕 Первый запуск тренажера - перемешиваем слова');
                     originalWords = allWordsFromFile;
                     words = shuffleArray(allWordsFromFile);
-                    pageWordCounts = {}; // НОВОЕ: сбрасываем размеры страниц
+                    pageWordCounts = {};
                     saveToLocalStorage('initialWordCount', allWordsFromFile.length);
                     saveToLocalStorage('wordsOrder', words);
                     saveToLocalStorage('pageWordCounts', pageWordCounts);
@@ -1190,12 +1190,12 @@
                     console.log('📂 Загружаем сохраненный порядок слов');
                     words = savedWordsOrder;
                     originalWords = allWordsFromFile.slice(0, savedWordCount);
-                    pageWordCounts = getFromLocalStorage('pageWordCounts', {}); // НОВОЕ: загружаем размеры страниц
+                    pageWordCounts = getFromLocalStorage('pageWordCounts', {});
                 } else {
                     console.log('📂 Перемешиваем слова (нет сохраненного порядка)');
                     originalWords = allWordsFromFile.slice(0, savedWordCount);
                     words = shuffleArray(originalWords);
-                    pageWordCounts = {}; // НОВОЕ: сбрасываем размеры страниц
+                    pageWordCounts = {};
                     saveToLocalStorage('wordsOrder', words);
                     saveToLocalStorage('pageWordCounts', pageWordCounts);
                 }
@@ -1236,7 +1236,7 @@
                 
                 openedWordsMap = getFromLocalStorage('openedWords', {});
                 errorWords = getFromLocalStorage('errors', []);
-                pageWordCounts = getFromLocalStorage('pageWordCounts', {}); // НОВОЕ: загружаем размеры страниц
+                pageWordCounts = getFromLocalStorage('pageWordCounts', {});
                 
                 renderErrors();
                 
@@ -1347,7 +1347,7 @@
                 openedWordsMap = {};
                 errorWords = [];
                 currentPage = 0;
-                pageWordCounts = {}; // НОВОЕ: сбрасываем размеры страниц
+                pageWordCounts = {};
                 
                 saveToLocalStorage('openedWords', openedWordsMap);
                 saveToLocalStorage('errors', errorWords);
@@ -1465,7 +1465,6 @@
             });
         });
 
-        // НОВАЯ ФУНКЦИЯ: Возврат слов в конец текущей страницы
         restoreWordsBtn.addEventListener('click', function() {
             if (errorWords.length === 0) {
                 alert('Нет ошибок для возврата');
@@ -1474,34 +1473,35 @@
             
             console.log(`Возвращаем ${errorWords.length} слов в конец текущей страницы ${currentPage}`);
             
-            // Вычисляем индекс последнего слова текущей страницы
             const pageEndIndex = getPageEndIndex(currentPage);
             
             console.log(`Вставляем слова после позиции ${pageEndIndex}`);
             
-            // Копируем слова из ошибок
             const wordsToRestore = errorWords.map(e => e.word);
             
-            // Вставляем в массив после последнего слова текущей страницы
+            // НОВОЕ: Закрываем вернувшиеся слова (удаляем из openedWordsMap)
+            wordsToRestore.forEach(word => {
+                const key = makeWordKey(word);
+                delete openedWordsMap[key];
+            });
+            
             words.splice(pageEndIndex + 1, 0, ...wordsToRestore);
             
-            // Увеличиваем счетчик слов для текущей страницы
             const currentCount = pageWordCounts[currentPage] || wordsPerPage;
             pageWordCounts[currentPage] = currentCount + wordsToRestore.length;
             
-            // Очищаем список ошибок
             errorWords = [];
             
             saveToLocalStorage('errors', errorWords);
             saveToLocalStorage('wordsOrder', words);
             saveToLocalStorage('pageWordCounts', pageWordCounts);
+            saveToLocalStorage('openedWords', openedWordsMap);
             
             renderErrors();
             updateStats();
             renderWords();
             scheduleSyncToFirebase();
             
-            // Прокручиваем вниз
             setTimeout(() => {
                 window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
             }, 100);
@@ -1513,27 +1513,21 @@
             }, 2000);
         });
 
-        // НОВАЯ ФУНКЦИЯ: Получить индекс конца страницы
         function getPageEndIndex(pageNum) {
             let startIndex = 0;
             
-            // Суммируем размеры всех предыдущих страниц
             for (let i = 0; i < pageNum; i++) {
                 const pageSize = pageWordCounts[i] || wordsPerPage;
                 startIndex += pageSize;
             }
             
-            // Размер текущей страницы
             const currentPageSize = pageWordCounts[pageNum] || wordsPerPage;
             
-            // Конец текущей страницы
             const endIndex = startIndex + currentPageSize - 1;
             
-            // Не выходим за границы массива
             return Math.min(endIndex, words.length - 1);
         }
 
-        // НОВАЯ ФУНКЦИЯ: Получить начальный индекс страницы
         function getPageStartIndex(pageNum) {
             let startIndex = 0;
             
@@ -1605,11 +1599,9 @@
             );
         }
 
-        // ИЗМЕНЕННАЯ ФУНКЦИЯ: Получить видимые слова с учетом переменных размеров страниц
         function getVisibleWords() {
             const visibleWords = [];
             
-            // Фильтруем слова, которые в ошибках (не показываем их)
             for (let i = 0; i < words.length; i++) {
                 const word = words[i];
                 
@@ -1621,7 +1613,6 @@
             return visibleWords;
         }
 
-        // ИЗМЕНЕННАЯ ФУНКЦИЯ: Рендер слов с учетом переменных размеров страниц
         function renderWords() {
             wordsList.innerHTML = '';
             
@@ -1640,7 +1631,6 @@
             for (let i = startIndex; i < endIndex && i < words.length; i++) {
                 const word = words[i];
                 
-                // Пропускаем слова, которые в ошибках
                 if (!isWordInErrors(word)) {
                     currentWords.push({ word, originalIndex: i });
                 }
@@ -1683,9 +1673,7 @@
             updatePagination();
         }
 
-        // ИЗМЕНЕННАЯ ФУНКЦИЯ: Обновление пагинации с учетом переменных размеров страниц
         function updatePagination() {
-            // Вычисляем общее количество страниц
             let totalPages = 0;
             let accumulatedWords = 0;
             let pageNum = 0;
