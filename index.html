@@ -142,6 +142,7 @@
             vertical-align: middle;
             word-wrap: break-word;
             overflow-wrap: break-word;
+            word-break: break-word;
         }
 
         .word-cell.russian {
@@ -160,23 +161,25 @@
             width: 50%;
             line-height: 2.2;
             padding: 22px 15px;
-            white-space: nowrap;
+            white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .word-cell.arabic.long-text {
-            font-size: 24px;
+            font-size: 28px;
         }
 
         .word-cell.arabic.very-long-text {
-            font-size: 20px;
+            font-size: 23px;
         }
 
         .word-cell.arabic.ultra-long-text {
-            font-size: 16px;
+            font-size: 18px;
         }
 
         .word-cell.arabic.mega-long-text {
-            font-size: 14px;
+            font-size: 16px;
         }
 
         .word-cell.hidden {
@@ -200,19 +203,19 @@
         }
 
         .word-cell.arabic.long-text.hidden::before {
-            font-size: 24px;
+            font-size: 28px;
         }
 
         .word-cell.arabic.very-long-text.hidden::before {
-            font-size: 20px;
+            font-size: 23px;
         }
 
         .word-cell.arabic.ultra-long-text.hidden::before {
-            font-size: 16px;
+            font-size: 18px;
         }
 
         .word-cell.arabic.mega-long-text.hidden::before {
-            font-size: 14px;
+            font-size: 16px;
         }
 
         .pagination {
@@ -669,19 +672,19 @@
             }
 
             .word-cell.arabic.long-text {
-                font-size: 22px;
+                font-size: 25px;
             }
 
             .word-cell.arabic.very-long-text {
-                font-size: 18px;
+                font-size: 21px;
             }
 
             .word-cell.arabic.ultra-long-text {
-                font-size: 15px;
+                font-size: 17px;
             }
 
             .word-cell.arabic.mega-long-text {
-                font-size: 13px;
+                font-size: 15px;
             }
 
             .errors-header {
@@ -1085,7 +1088,7 @@
             const lines = text.split('\n');
             const parsedWords = [];
             
-            lines.forEach((line) => {
+            lines.forEach((line, index) => {
                 line = line.trim().replace(/\r/g, '');
                 
                 if (!line || line.length < 3) return;
@@ -1100,11 +1103,54 @@
                 const ar = parts.slice(1).join(separator).trim();
                 
                 if (ru && ar) {
-                    parsedWords.push({ ru, ar, id: generateWordId() });
+                    parsedWords.push({ 
+                        ru, 
+                        ar, 
+                        id: generateWordId(),
+                        originalIndex: index
+                    });
                 }
             });
             
             return parsedWords;
+        }
+
+        function detectChangedWords(newWordsFromFile, savedWords) {
+            const changedWords = [];
+            const wordsToRemove = [];
+            
+            const savedWordsByOriginalIndex = {};
+            savedWords.forEach(word => {
+                if (word.originalIndex !== undefined) {
+                    if (!savedWordsByOriginalIndex[word.originalIndex]) {
+                        savedWordsByOriginalIndex[word.originalIndex] = [];
+                    }
+                    savedWordsByOriginalIndex[word.originalIndex].push(word);
+                }
+            });
+            
+            newWordsFromFile.forEach(newWord => {
+                const savedVersions = savedWordsByOriginalIndex[newWord.originalIndex];
+                
+                if (savedVersions && savedVersions.length > 0) {
+                    savedVersions.forEach(savedWord => {
+                        if (savedWord.ru !== newWord.ru || savedWord.ar !== newWord.ar) {
+                            console.log(`📝 Изменение: "${savedWord.ru} — ${savedWord.ar}" → "${newWord.ru} — ${newWord.ar}"`);
+                            
+                            wordsToRemove.push(savedWord.id);
+                            
+                            changedWords.push({
+                                ru: newWord.ru,
+                                ar: newWord.ar,
+                                id: generateWordId(),
+                                originalIndex: newWord.originalIndex
+                            });
+                        }
+                    });
+                }
+            });
+            
+            return { changedWords, wordsToRemove };
         }
 
         function validateProgress(currentWords) {
@@ -1183,6 +1229,45 @@
                     });
                     originalWords = allWordsFromFile.slice(0, savedWordCount);
                     pageWordCounts = getFromLocalStorage('pageWordCounts', {});
+                    
+                    const { changedWords, wordsToRemove } = detectChangedWords(allWordsFromFile, words);
+                    
+                    if (changedWords.length > 0) {
+                        console.log(`🔄 Найдено ${changedWords.length} измененных слов`);
+                        
+                        let removedFromCurrentPage = 0;
+                        const startIndexOfCurrentPage = getPageStartIndex(currentPage);
+                        const endIndexOfCurrentPage = getPageEndIndex(currentPage) + 1;
+                        
+                        words = words.filter((word, index) => {
+                            const shouldRemove = wordsToRemove.includes(word.id);
+                            if (shouldRemove) {
+                                if (index >= startIndexOfCurrentPage && index < endIndexOfCurrentPage) {
+                                    removedFromCurrentPage++;
+                                }
+                                
+                                delete openedWordsMap[word.id];
+                                
+                                errorWords = errorWords.filter(e => e.word.id !== word.id);
+                            }
+                            return !shouldRemove;
+                        });
+                        
+                        if (removedFromCurrentPage > 0) {
+                            const currentCount = pageWordCounts[currentPage] || wordsPerPage;
+                            pageWordCounts[currentPage] = Math.max(wordsPerPage, currentCount - removedFromCurrentPage);
+                        }
+                        
+                        const nextPageStartIndex = getPageStartIndex(currentPage + 1);
+                        words.splice(nextPageStartIndex, 0, ...changedWords);
+                        
+                        saveToLocalStorage('wordsOrder', words);
+                        saveToLocalStorage('pageWordCounts', pageWordCounts);
+                        saveToLocalStorage('openedWords', openedWordsMap);
+                        saveToLocalStorage('errors', errorWords);
+                        
+                        console.log(`✓ Измененные слова добавлены в начало страницы ${currentPage + 2}`);
+                    }
                 } else {
                     console.log('📂 Перемешиваем слова (нет сохраненного порядка)');
                     originalWords = allWordsFromFile.slice(0, savedWordCount);
@@ -1476,7 +1561,8 @@
                 return {
                     ru: e.word.ru,
                     ar: e.word.ar,
-                    id: generateWordId()
+                    id: generateWordId(),
+                    originalIndex: e.word.originalIndex
                 };
             });
             
