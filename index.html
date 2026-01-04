@@ -157,27 +157,18 @@
             text-align: right;
             direction: rtl;
             color: #2c3e50;
-            font-size: 32px;
+            font-size: 30px;
             width: 50%;
-            line-height: 2.2;
+            line-height: 1.6;
             padding: 22px 15px;
+        }
+
+        .word-cell.arabic.has-multiline {
+            white-space: normal;
+        }
+
+        .word-cell.arabic:not(.has-multiline) {
             white-space: nowrap;
-        }
-
-        .word-cell.arabic.long-text {
-            font-size: 28px;
-        }
-
-        .word-cell.arabic.very-long-text {
-            font-size: 26px;
-        }
-
-        .word-cell.arabic.ultra-long-text {
-            font-size: 18px;
-        }
-
-        .word-cell.arabic.mega-long-text {
-            font-size: 16px;
         }
 
         .word-cell.hidden {
@@ -197,23 +188,7 @@
         .word-cell.arabic.hidden::before {
             left: auto;
             right: 15px;
-            font-size: 32px;
-        }
-
-        .word-cell.arabic.long-text.hidden::before {
-            font-size: 28px;
-        }
-
-        .word-cell.arabic.very-long-text.hidden::before {
-            font-size: 26px;
-        }
-
-        .word-cell.arabic.ultra-long-text.hidden::before {
-            font-size: 18px;
-        }
-
-        .word-cell.arabic.mega-long-text.hidden::before {
-            font-size: 16px;
+            font-size: 30px;
         }
 
         .pagination {
@@ -664,25 +639,8 @@
             }
 
             .word-cell.arabic {
-                font-size: 28px;
+                font-size: 26px;
                 padding: 20px 12px;
-                line-height: 2.2;
-            }
-
-            .word-cell.arabic.long-text {
-                font-size: 25px;
-            }
-
-            .word-cell.arabic.very-long-text {
-                font-size: 23px;
-            }
-
-            .word-cell.arabic.ultra-long-text {
-                font-size: 17px;
-            }
-
-            .word-cell.arabic.mega-long-text {
-                font-size: 15px;
             }
 
             .errors-header {
@@ -1040,15 +998,7 @@
                     saveToLocalStorage('nextWordId', nextWordId);
                     saveToLocalStorage('lastSync', new Date().toISOString());
                     
-                    console.log('✓ Загружено из Firebase:', {
-                        openedWords: Object.keys(openedWordsMap).length,
-                        errors: errorWords.length,
-                        initialWordCount: savedWordCount,
-                        wordsCount: words.length,
-                        currentPage: data.currentPage,
-                        pageWordCounts: pageWordCounts
-                    });
-                    
+                    console.log('✓ Загружено из Firebase');
                     showSyncStatus('✓ Загружено из облака', 'synced');
                     return true;
                 } else {
@@ -1245,7 +1195,6 @@
                                 }
                                 
                                 delete openedWordsMap[word.id];
-                                
                                 errorWords = errorWords.filter(e => e.word.id !== word.id);
                             }
                             return !shouldRemove;
@@ -1636,27 +1585,61 @@
             return result;
         }
 
-        function getArabicSizeClass(text) {
-            const textLength = text.replace(/\s/g, '').length;
-            
+        // НОВАЯ ФУНКЦИЯ: Форматирование арабского текста с переносами
+        function formatArabicWithLineBreaks(text) {
             const allSeparators = [' — ', '—', ' – ', '–', ' - ', '-'];
-            let separatorCount = 0;
+            let separator = null;
             
+            // Находим используемый разделитель
             for (const sep of allSeparators) {
-                const matches = text.split(sep).length - 1;
-                separatorCount += matches;
+                if (text.includes(sep)) {
+                    separator = sep;
+                    break;
+                }
             }
             
-            if (textLength > 60 || separatorCount >= 4) {
-                return 'mega-long-text';
-            } else if (textLength > 45 || separatorCount >= 3) {
-                return 'ultra-long-text';
-            } else if (textLength > 30 || separatorCount >= 2) {
-                return 'very-long-text';
-            } else if (textLength > 15 || separatorCount >= 1) {
-                return 'long-text';
+            if (!separator) return text;
+            
+            const parts = text.split(separator);
+            const separatorCount = parts.length - 1;
+            
+            // 1-3 формата: без переносов
+            if (separatorCount <= 2) {
+                return text;
             }
-            return '';
+            
+            // 4 формата: 2 + 2
+            if (separatorCount === 3) {
+                return parts[0] + separator + parts[1] + '<br>' + 
+                       parts[2] + separator + parts[3];
+            }
+            
+            // 5 форматов: 3 + 2
+            if (separatorCount === 4) {
+                return parts[0] + separator + parts[1] + separator + parts[2] + '<br>' + 
+                       parts[3] + separator + parts[4];
+            }
+            
+            // 6 форматов: 3 + 3
+            if (separatorCount === 5) {
+                return parts[0] + separator + parts[1] + separator + parts[2] + '<br>' + 
+                       parts[3] + separator + parts[4] + separator + parts[5];
+            }
+            
+            // 7+ форматов: 3 + 3 + остальное
+            if (separatorCount >= 6) {
+                const firstLine = parts.slice(0, 3).join(separator);
+                const secondLine = parts.slice(3, 6).join(separator);
+                const remaining = parts.slice(6).join(separator);
+                
+                if (remaining) {
+                    return firstLine + '<br>' + secondLine + '<br>' + remaining;
+                } else {
+                    return firstLine + '<br>' + secondLine;
+                }
+            }
+            
+            return text;
         }
 
         function isWordOpened(word) {
@@ -1724,19 +1707,20 @@
                 }
                 
                 const formattedRu = formatRussian(word.ru);
-                const arabicSizeClass = getArabicSizeClass(word.ar);
+                const formattedAr = formatArabicWithLineBreaks(word.ar);
+                const hasMultiline = formattedAr.includes('<br>');
                 
                 row.dataset.wordIndex = item.originalIndex;
                 
                 if (mode === 'ar-ru') {
                     row.innerHTML = `
                         <td class="word-cell russian ${isOpened ? '' : 'hidden'}" data-ru="${word.ru}">${isOpened ? formattedRu : ''}</td>
-                        <td class="word-cell arabic ${arabicSizeClass}">${word.ar}</td>
+                        <td class="word-cell arabic ${hasMultiline ? 'has-multiline' : ''}">${formattedAr}</td>
                     `;
                 } else {
                     row.innerHTML = `
                         <td class="word-cell russian">${formattedRu}</td>
-                        <td class="word-cell arabic ${arabicSizeClass} ${isOpened ? '' : 'hidden'}" data-ar="${word.ar}">${isOpened ? word.ar : ''}</td>
+                        <td class="word-cell arabic ${hasMultiline ? 'has-multiline' : ''} ${isOpened ? '' : 'hidden'}" data-ar="${word.ar}">${isOpened ? formattedAr : ''}</td>
                     `;
                 }
 
@@ -1806,7 +1790,11 @@
                     hiddenCell.innerHTML = formatRussian(text);
                 } else {
                     text = hiddenCell.dataset.ar;
-                    hiddenCell.textContent = text;
+                    hiddenCell.innerHTML = formatArabicWithLineBreaks(text);
+                    
+                    if (formatArabicWithLineBreaks(text).includes('<br>')) {
+                        hiddenCell.classList.add('has-multiline');
+                    }
                 }
                 
                 hiddenCell.classList.remove('hidden');
