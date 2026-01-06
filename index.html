@@ -1022,14 +1022,23 @@
             return shuffled;
         }
 
+        // НОВАЯ ФУНКЦИЯ: ищет САМЫЙ ЛЕВЫЙ разделитель в строке
         function findSeparator(line) {
-            if (line.includes(' — ')) return ' — ';
-            if (line.includes('—')) return '—';
-            if (line.includes(' – ')) return ' – ';
-            if (line.includes('–')) return '–';
-            if (line.includes(' - ')) return ' - ';
-            if (line.includes('-')) return '-';
-            return null;
+            const allSeparators = [' — ', '—', ' – ', '–', ' - ', '-'];
+            
+            let firstSeparator = null;
+            let firstPosition = Infinity;
+            
+            // Ищем самый левый разделитель
+            allSeparators.forEach(sep => {
+                const pos = line.indexOf(sep);
+                if (pos !== -1 && pos < firstPosition) {
+                    firstPosition = pos;
+                    firstSeparator = sep;
+                }
+            });
+            
+            return firstSeparator;
         }
 
         function parseWordsFromText(text) {
@@ -1585,12 +1594,10 @@
             return result;
         }
 
-        // НОВАЯ ФУНКЦИЯ: Форматирование арабского текста с переносами
         function formatArabicWithLineBreaks(text) {
             const allSeparators = [' — ', '—', ' – ', '–', ' - ', '-'];
             let separator = null;
             
-            // Находим используемый разделитель
             for (const sep of allSeparators) {
                 if (text.includes(sep)) {
                     separator = sep;
@@ -1603,30 +1610,25 @@
             const parts = text.split(separator);
             const separatorCount = parts.length - 1;
             
-            // 1-3 формата: без переносов
             if (separatorCount <= 2) {
                 return text;
             }
             
-            // 4 формата: 2 + 2
             if (separatorCount === 3) {
                 return parts[0] + separator + parts[1] + '<br>' + 
                        parts[2] + separator + parts[3];
             }
             
-            // 5 форматов: 3 + 2
             if (separatorCount === 4) {
                 return parts[0] + separator + parts[1] + separator + parts[2] + '<br>' + 
                        parts[3] + separator + parts[4];
             }
             
-            // 6 форматов: 3 + 3
             if (separatorCount === 5) {
                 return parts[0] + separator + parts[1] + separator + parts[2] + '<br>' + 
                        parts[3] + separator + parts[4] + separator + parts[5];
             }
             
-            // 7+ форматов: 3 + 3 + остальное
             if (separatorCount >= 6) {
                 const firstLine = parts.slice(0, 3).join(separator);
                 const secondLine = parts.slice(3, 6).join(separator);
