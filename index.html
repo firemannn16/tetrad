@@ -1022,14 +1022,12 @@
             return shuffled;
         }
 
-        // НОВАЯ ФУНКЦИЯ: ищет САМЫЙ ЛЕВЫЙ разделитель в строке
         function findSeparator(line) {
             const allSeparators = [' — ', '—', ' – ', '–', ' - ', '-'];
             
             let firstSeparator = null;
             let firstPosition = Infinity;
             
-            // Ищем самый левый разделитель
             allSeparators.forEach(sep => {
                 const pos = line.indexOf(sep);
                 if (pos !== -1 && pos < firstPosition) {
@@ -1108,6 +1106,25 @@
             });
             
             return { changedWords, wordsToRemove };
+        }
+
+        function detectDeletedWords(newWordsFromFile, savedWords) {
+            const wordsToRemove = [];
+            
+            const fileWordsSet = new Set(
+                newWordsFromFile.map(w => `${w.ru}|||${w.ar}`)
+            );
+            
+            savedWords.forEach(savedWord => {
+                const wordKey = `${savedWord.ru}|||${savedWord.ar}`;
+                
+                if (!fileWordsSet.has(wordKey)) {
+                    console.log(`🗑️ Удалено из файла: "${savedWord.ru} — ${savedWord.ar}"`);
+                    wordsToRemove.push(savedWord.id);
+                }
+            });
+            
+            return wordsToRemove;
         }
 
         function validateProgress(currentWords) {
@@ -1189,19 +1206,20 @@
                     
                     const { changedWords, wordsToRemove } = detectChangedWords(allWordsFromFile, words);
                     
-                    if (changedWords.length > 0) {
-                        console.log(`🔄 Найдено ${changedWords.length} измененных слов`);
+                    const deletedWordIds = detectDeletedWords(allWordsFromFile, words);
+                    
+                    const allWordsToRemove = [...new Set([...wordsToRemove, ...deletedWordIds])];
+                    
+                    if (allWordsToRemove.length > 0) {
+                        console.log(`🔄 Найдено ${wordsToRemove.length} измененных и ${deletedWordIds.length} удаленных слов (всего к удалению: ${allWordsToRemove.length})`);
                         
-                        let removedFromCurrentPage = 0;
-                        const startIndexOfCurrentPage = getPageStartIndex(currentPage);
-                        const endIndexOfCurrentPage = getPageEndIndex(currentPage) + 1;
+                        const pageIndices = {};
                         
                         words = words.filter((word, index) => {
-                            const shouldRemove = wordsToRemove.includes(word.id);
+                            const shouldRemove = allWordsToRemove.includes(word.id);
                             if (shouldRemove) {
-                                if (index >= startIndexOfCurrentPage && index < endIndexOfCurrentPage) {
-                                    removedFromCurrentPage++;
-                                }
+                                const pageNum = getPageNumberForIndex(index);
+                                pageIndices[pageNum] = (pageIndices[pageNum] || 0) + 1;
                                 
                                 delete openedWordsMap[word.id];
                                 errorWords = errorWords.filter(e => e.word.id !== word.id);
@@ -1209,20 +1227,23 @@
                             return !shouldRemove;
                         });
                         
-                        if (removedFromCurrentPage > 0) {
-                            const currentCount = pageWordCounts[currentPage] || wordsPerPage;
-                            pageWordCounts[currentPage] = Math.max(wordsPerPage, currentCount - removedFromCurrentPage);
+                        for (const [pageNum, removedCount] of Object.entries(pageIndices)) {
+                            const page = parseInt(pageNum);
+                            const currentCount = pageWordCounts[page] || wordsPerPage;
+                            pageWordCounts[page] = Math.max(wordsPerPage, currentCount - removedCount);
+                            console.log(`📄 Страница ${page + 1}: удалено ${removedCount} слов, новый размер: ${pageWordCounts[page]}`);
                         }
                         
-                        const nextPageStartIndex = getPageStartIndex(currentPage + 1);
-                        words.splice(nextPageStartIndex, 0, ...changedWords);
+                        if (changedWords.length > 0) {
+                            const nextPageStartIndex = getPageStartIndex(currentPage + 1);
+                            words.splice(nextPageStartIndex, 0, ...changedWords);
+                            console.log(`✓ ${changedWords.length} измененных слов добавлены в начало страницы ${currentPage + 2}`);
+                        }
                         
                         saveToLocalStorage('wordsOrder', words);
                         saveToLocalStorage('pageWordCounts', pageWordCounts);
                         saveToLocalStorage('openedWords', openedWordsMap);
                         saveToLocalStorage('errors', errorWords);
-                        
-                        console.log(`✓ Измененные слова добавлены в начало страницы ${currentPage + 2}`);
                     }
                 } else {
                     console.log('📂 Перемешиваем слова (нет сохраненного порядка)');
@@ -1247,6 +1268,24 @@
                 console.error('Ошибка загрузки слов:', error);
                 wordsList.innerHTML = '<div class="loading">❌ Ошибка загрузки слов: ' + error.message + '</div>';
             }
+        }
+
+        function getPageNumberForIndex(index) {
+            let currentIndex = 0;
+            let pageNum = 0;
+            
+            while (currentIndex <= index) {
+                const pageSize = pageWordCounts[pageNum] || wordsPerPage;
+                
+                if (index < currentIndex + pageSize) {
+                    return pageNum;
+                }
+                
+                currentIndex += pageSize;
+                pageNum++;
+            }
+            
+            return pageNum;
         }
 
         async function initialize() {
